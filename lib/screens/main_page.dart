@@ -1,0 +1,478 @@
+import 'package:flutter/material.dart';
+import 'package:pinttest/services/api_service.dart';
+import 'package:pinttest/services/session.dart';
+import 'package:pinttest/screens/badges_page.dart';
+import 'package:pinttest/screens/profile_page.dart';
+import 'package:pinttest/screens/notifications_page.dart';
+import 'package:pinttest/screens/login_page.dart';
+import 'package:pinttest/screens/ranking_page.dart';
+
+class MainPage extends StatefulWidget {
+  @override
+  State<MainPage> createState() => _MainPageState();
+}
+
+class _MainPageState extends State<MainPage> {
+  late Future<List<dynamic>> _badgesFuture;
+  late Future<List<dynamic>> _notificacoesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  void _loadData() {
+    _badgesFuture = ApiService.getBadges();
+    _notificacoesFuture = ApiService.getNotificacoes();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fotoUrl = Session.fotoUrl.trim();
+
+    return Scaffold(
+      backgroundColor: Color(0xFFF5F5F5),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: Icon(Icons.menu, color: Colors.black87),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
+        title: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: '...',
+              hintStyle: TextStyle(color: Colors.grey),
+              prefixIcon: Icon(Icons.search, color: Colors.grey),
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 10),
+            ),
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: FutureBuilder<List<dynamic>>(
+              future: _notificacoesFuture,
+              builder: (context, notifSnap) {
+                final naoLidas =
+                    (notifSnap.data ?? []).where((n) => n['lido'] == false).length;
+
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.notifications_none, color: Colors.black87),
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => NotificationsPage()),
+                        );
+                        _loadData();
+                      },
+                    ),
+                    if (naoLidas > 0)
+                      Positioned(
+                        right: 6,
+                        top: 8,
+                        child: Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '$naoLidas',
+                              style: TextStyle(color: Colors.white, fontSize: 10),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      drawer: _buildDrawer(context, fotoUrl),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          _loadData();
+          await Future.wait([_badgesFuture, _notificacoesFuture]);
+        },
+        child: FutureBuilder<List<dynamic>>(
+          future: _badgesFuture,
+          builder: (context, badgeSnap) {
+            final listaBadges = badgeSnap.data ?? [];
+
+            return ListView(
+              physics: AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.all(16),
+              children: [
+                Text(
+                  'Bom Dia!',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E3A5F),
+                  ),
+                ),
+                SizedBox(height: 16),
+
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Meta Definida',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Conseguiste alcançar 5 badges nos últimos 4 meses!',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      Text(
+                        'Faltam 5 badges para alcançar a meta definida',
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'Badges conquistados',
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                      SizedBox(height: 8),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: (listaBadges.isEmpty
+                                  ? List.filled(5, null)
+                                  : listaBadges)
+                              .take(5)
+                              .map<Widget>(
+                                (b) => Padding(
+                                  padding: EdgeInsets.only(right: 8),
+                                  child: CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: Colors.blue.shade100,
+                                    backgroundImage:
+                                        b != null && b['imagemurl'] != null
+                                            ? NetworkImage(b['imagemurl'])
+                                            : null,
+                                    child: b == null || b['imagemurl'] == null
+                                        ? Icon(
+                                            Icons.emoji_events,
+                                            size: 22,
+                                            color: Colors.blue,
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 24),
+
+                Text(
+                  'Candidaturas Submetidas',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 12),
+                Row(
+                  children: (listaBadges.isEmpty ? List.filled(2, null) : listaBadges)
+                      .take(2)
+                      .map<Widget>(
+                        (b) => Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: _miniCard(b, showProgress: true),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+
+                SizedBox(height: 24),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Badges Recomendados',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => BadgesPage()),
+                      ),
+                      child: Icon(Icons.arrow_forward,
+                          size: 18, color: Colors.black54),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                Row(
+                  children: (listaBadges.isEmpty ? List.filled(2, null) : listaBadges)
+                      .take(2)
+                      .map<Widget>(
+                        (b) => Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: _miniCard(b, showProgress: false),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                SizedBox(height: 24),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Drawer _buildDrawer(BuildContext context, String fotoUrl) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () async {
+                Navigator.pop(context);
+                final resultado = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ProfilePage()),
+                );
+
+                if (resultado == true || mounted) {
+                  setState(() {});
+                }
+              },
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: Colors.purple.shade100,
+                      child: ClipOval(
+                        child: fotoUrl.isNotEmpty
+                            ? Image.network(
+                                fotoUrl,
+                                width: 52,
+                                height: 52,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Icon(
+                                  Icons.person,
+                                  color: Colors.purple,
+                                  size: 30,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person,
+                                color: Colors.purple,
+                                size: 30,
+                              ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          Session.nome,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          'Talent Management',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            _drawerItem(
+              Icons.home,
+              'Home',
+              selected: true,
+              onTap: () => Navigator.pop(context),
+            ),
+
+            _drawerItem(Icons.emoji_events_outlined, 'Catálogo de Badges',
+                onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => BadgesPage()),
+              );
+            }),
+
+            _drawerItem(Icons.bar_chart, 'Rankings', onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => RankingPage()),
+              );
+            }),
+
+            _drawerItem(Icons.assignment_outlined, 'Candidaturas'),
+            _drawerItem(Icons.settings_outlined, 'Configurações'),
+            _drawerItem(Icons.calendar_today_outlined, 'Calendário'),
+
+            _drawerItem(Icons.logout, 'Terminar Sessão', onTap: () {
+              Session.terminar();
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => LoginPage()),
+                (route) => false,
+              );
+            }),
+
+            Spacer(),
+            Divider(),
+            _drawerItem(Icons.info_outline, 'Sobre'),
+            _drawerItem(Icons.help_outline, 'Ajuda'),
+            SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ListTile _drawerItem(
+    IconData icon,
+    String label, {
+    VoidCallback? onTap,
+    bool selected = false,
+  }) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: selected ? Colors.white : Colors.grey[700],
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: selected ? Colors.white : Colors.grey[800],
+          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      tileColor: selected ? Color(0xFF2563EB) : null,
+      shape: selected
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            )
+          : null,
+      onTap: onTap,
+    );
+  }
+
+  Widget _miniCard(dynamic badge, {required bool showProgress}) {
+    final int atual =
+        int.tryParse(badge?['progresso_atual']?.toString() ?? '0') ?? 0;
+    final int total =
+        int.tryParse(badge?['progresso_total']?.toString() ?? '0') ?? 0;
+    final double pct = total > 0 ? (atual / total).clamp(0.0, 1.0) : 0.5;
+
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)],
+      ),
+      child: Column(
+        children: [
+          badge == null || badge['imagemurl'] == null
+              ? Icon(Icons.emoji_events, size: 50, color: Colors.grey)
+              : Image.network(
+                  badge['imagemurl'],
+                  width: 50,
+                  height: 50,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Icon(
+                    Icons.emoji_events,
+                    size: 50,
+                    color: Colors.grey,
+                  ),
+                ),
+          SizedBox(height: 6),
+          Text(
+            badge?['nome'] ?? 'Badge',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2563EB),
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (showProgress) ...[
+            SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Progresso',
+                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+                Text(
+                  '${(pct * 100).toInt()}%',
+                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+              ],
+            ),
+            SizedBox(height: 4),
+            LinearProgressIndicator(
+              value: pct,
+              backgroundColor: Color(0xFFE5E7EB),
+              color: Color(0xFF2563EB),
+              minHeight: 4,
+            ),
+            SizedBox(height: 6),
+            Text(
+              '10 dias restantes',
+              style: TextStyle(fontSize: 10, color: Colors.grey),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
