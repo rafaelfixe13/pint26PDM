@@ -50,6 +50,29 @@ class ApiService {
     );
   }
 
+  static Future<List<dynamic>> getBadgesDoUtilizador() async {
+    final userId = Session.id;
+    if (userId == 0) {
+      throw Exception('Sessão inválida. Faz login novamente.');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/utilizadores/$userId/badges'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as List;
+    }
+
+    throw Exception(
+      _extractErrorMessage(
+        response,
+        fallback: 'Erro ao carregar badges do utilizador',
+      ),
+    );
+  }
+
   static Future<List<dynamic>> getUtilizadores() async {
     final response = await http.get(
       Uri.parse('$baseUrl/utilizadores'),
