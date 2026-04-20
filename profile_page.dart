@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:pinttest/services/session.dart';
-import 'package:pinttest/services/api_service.dart';
-import 'package:pinttest/screens/edit_photo_page.dart';
+import '../services/session.dart';
+import '../services/api_service.dart';
+import '../screens/edit_photo_page.dart';
 
 class ProfilePage extends StatefulWidget {
   @override

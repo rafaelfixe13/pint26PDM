@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pinttest/services/api_service.dart';
+import '../services/api_service.dart';
 import 'badge_detail_page.dart';
 
 class BadgesPage extends StatefulWidget {

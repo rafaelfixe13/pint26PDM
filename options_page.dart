@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pinttest/screens/change_password.dart';
+import '../screens/change_password.dart';
 
 class OptionsPage extends StatefulWidget {
   const OptionsPage({super.key});
