@@ -131,6 +131,44 @@ app.get("/utilizadores/ranking", async (req, res) => {
   }
 });
 
+// rdpd
+app.patch("/utilizadores/:id/rgpd", async (req, res) => {
+  try {
+    const idUtilizador = parseInt(req.params.id, 10);
+    const { rgpd } = req.body;
+
+    if (isNaN(idUtilizador)) {
+      return res.status(400).json({ error: "ID do utilizador inválido" });
+    }
+
+    if (typeof rgpd !== "boolean") {
+      return res.status(400).json({ error: "O campo rgpd tem de ser boolean" });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE utilizadores
+      SET rgpd = $1
+      WHERE idutilizador = $2
+      RETURNING idutilizador, nome, email, rgpd
+      `,
+      [rgpd, idUtilizador]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    res.json({
+      success: true,
+      utilizador: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Erro ao atualizar RGPD:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─────────────────────────────────────────────────────────
 // AUTH — LOGIN
 // ─────────────────────────────────────────────────────────
@@ -322,6 +360,43 @@ app.delete("/notificacoes/:id", async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error("Erro ao apagar notificação:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────
+// Candidaturas
+// ─────────────────────────────────────────────────────────
+
+app.get("/candidaturas", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        cb.idcandidatura,
+        cb.user_id,
+        cb.badge_id,
+        cb.estado,
+        cb.datasubmissao,
+        cb.comentariogeral,
+        cb.datacriacao,
+        b.idbadge,
+        b.nome,
+        b.descricao,
+        b.imagemurl,
+        b.nivel,
+        b.pontos,
+        b.linkpublicobase,
+        b.competencias
+      FROM candidaturasbadge cb
+      INNER JOIN badges b ON b.idbadge = cb.badge_id
+      WHERE cb.user_id = 1
+      ORDER BY cb.datacriacao DESC
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao carregar candidaturas:", err.message);
     res.status(500).json({ error: err.message });
   }
 });

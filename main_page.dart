@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
-import '../services/session.dart';
-import '../screens/badges_page.dart';
-import '../screens/profile_page.dart';
-import '../screens/notifications_page.dart';
-import '../screens/login_page.dart';
-import '../screens/ranking_page.dart';
-import '../screens/options_page.dart';
-import '../screens/change_password.dart';
+import 'package:pinttest/services/api_service.dart';
+import 'package:pinttest/services/session.dart';
+import 'package:pinttest/screens/badges_page.dart';
+import 'package:pinttest/screens/profile_page.dart';
+import 'package:pinttest/screens/notifications_page.dart';
+import 'package:pinttest/screens/login_page.dart';
+import 'package:pinttest/screens/ranking_page.dart';
+import 'package:pinttest/screens/options_page.dart';
+import 'package:pinttest/screens/help_page.dart';
+import 'package:pinttest/screens/about_page.dart';
+import 'package:pinttest/screens/candidaturas.dart';
 
 class MainPage extends StatefulWidget {
   @override
@@ -28,6 +30,48 @@ class _MainPageState extends State<MainPage> {
     _badgesFuture = ApiService.getBadges();
     _notificacoesFuture = ApiService.getNotificacoes();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _confirmarTerminarSessao(BuildContext context) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Terminar sessão',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Tens a certeza que queres terminar a sessão?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Não'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Sim'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar == true) {
+      Session.terminar();
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => LoginPage()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -375,7 +419,17 @@ class _MainPageState extends State<MainPage> {
               },
             ),
 
-            _drawerItem(Icons.assignment_outlined, 'Candidaturas'),
+            _drawerItem(
+              Icons.assignment_outlined,
+              'Candidaturas',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CandidaturasPage()),
+                );
+              },
+            ),
 
             _drawerItem(
               Icons.settings_outlined,
@@ -394,29 +448,35 @@ class _MainPageState extends State<MainPage> {
             _drawerItem(
               Icons.logout,
               'Terminar Sessão',
-              onTap: () {
-                Session.terminar();
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => LoginPage()),
-                  (route) => false,
-                );
+              onTap: () async {
+                Navigator.pop(context);
+                await _confirmarTerminarSessao(context);
               },
             ),
 
             const Spacer(),
             const Divider(),
-            _drawerItem(Icons.info_outline, 'Sobre'),
-            _drawerItem(Icons.help_outline, 'Ajuda'),
 
             _drawerItem(
-              Icons.lock_outline,
-              'Change Password',
+              Icons.info_outline,
+              'Sobre',
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => ChangePasswordPage()),
+                  MaterialPageRoute(builder: (_) => const AboutPage()),
+                );
+              },
+            ),
+
+            _drawerItem(
+              Icons.help_outline,
+              'Ajuda',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AjudaPage()),
                 );
               },
             ),
