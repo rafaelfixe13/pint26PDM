@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pinttest/screens/help_page.dart';
 import 'package:pinttest/services/api_service.dart';
 import 'package:pinttest/services/session.dart';
 import 'package:pinttest/screens/badges_page.dart';
@@ -6,6 +7,8 @@ import 'package:pinttest/screens/profile_page.dart';
 import 'package:pinttest/screens/notifications_page.dart';
 import 'package:pinttest/screens/login_page.dart';
 import 'package:pinttest/screens/ranking_page.dart';
+import 'package:pinttest/screens/options_page.dart';
+import 'package:pinttest/screens/change_password.dart';
 
 class MainPage extends StatefulWidget {
   @override
@@ -33,23 +36,23 @@ class _MainPageState extends State<MainPage> {
     final fotoUrl = Session.fotoUrl.trim();
 
     return Scaffold(
-      backgroundColor: Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: Builder(
           builder: (ctx) => IconButton(
-            icon: Icon(Icons.menu, color: Colors.black87),
+            icon: const Icon(Icons.menu, color: Colors.black87),
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
         title: Container(
           height: 40,
           decoration: BoxDecoration(
-            color: Color(0xFFF1F5F9),
+            color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(30),
           ),
-          child: TextField(
+          child: const TextField(
             decoration: InputDecoration(
               hintText: '...',
               hintStyle: TextStyle(color: Colors.grey),
@@ -61,7 +64,7 @@ class _MainPageState extends State<MainPage> {
         ),
         actions: [
           Padding(
-            padding: EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(right: 8),
             child: FutureBuilder<List<dynamic>>(
               future: _notificacoesFuture,
               builder: (context, notifSnap) {
@@ -72,11 +75,16 @@ class _MainPageState extends State<MainPage> {
                   alignment: Alignment.center,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.notifications_none, color: Colors.black87),
+                      icon: const Icon(
+                        Icons.notifications_none,
+                        color: Colors.black87,
+                      ),
                       onPressed: () async {
                         await Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => NotificationsPage()),
+                          MaterialPageRoute(
+                            builder: (_) => NotificationsPage(),
+                          ),
                         );
                         _loadData();
                       },
@@ -88,14 +96,17 @@ class _MainPageState extends State<MainPage> {
                         child: Container(
                           width: 18,
                           height: 18,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: Colors.red,
                             shape: BoxShape.circle,
                           ),
                           child: Center(
                             child: Text(
                               '$naoLidas',
-                              style: TextStyle(color: Colors.white, fontSize: 10),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                              ),
                             ),
                           ),
                         ),
@@ -119,10 +130,10 @@ class _MainPageState extends State<MainPage> {
             final listaBadges = badgeSnap.data ?? [];
 
             return ListView(
-              physics: AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.all(16),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
               children: [
-                Text(
+                const Text(
                   'Bom Dia!',
                   style: TextStyle(
                     fontSize: 28,
@@ -130,38 +141,43 @@ class _MainPageState extends State<MainPage> {
                     color: Color(0xFF1E3A5F),
                   ),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
 
                 Container(
                   width: double.infinity,
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black12, blurRadius: 8),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Meta Definida',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
-                      SizedBox(height: 6),
-                      Text(
+                      const SizedBox(height: 6),
+                      const Text(
                         'Conseguiste alcançar 5 badges nos últimos 4 meses!',
                         style: TextStyle(fontSize: 13),
                       ),
-                      Text(
+                      const Text(
                         'Faltam 5 badges para alcançar a meta definida',
                         style: TextStyle(color: Colors.grey, fontSize: 13),
                       ),
-                      SizedBox(height: 12),
-                      Text(
+                      const SizedBox(height: 12),
+                      const Text(
                         'Badges conquistados',
                         style: TextStyle(color: Colors.grey, fontSize: 12),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -171,7 +187,7 @@ class _MainPageState extends State<MainPage> {
                               .take(5)
                               .map<Widget>(
                                 (b) => Padding(
-                                  padding: EdgeInsets.only(right: 8),
+                                  padding: const EdgeInsets.only(right: 8),
                                   child: CircleAvatar(
                                     radius: 22,
                                     backgroundColor: Colors.blue.shade100,
@@ -180,7 +196,7 @@ class _MainPageState extends State<MainPage> {
                                             ? NetworkImage(b['imagemurl'])
                                             : null,
                                     child: b == null || b['imagemurl'] == null
-                                        ? Icon(
+                                        ? const Icon(
                                             Icons.emoji_events,
                                             size: 22,
                                             color: Colors.blue,
@@ -196,20 +212,20 @@ class _MainPageState extends State<MainPage> {
                   ),
                 ),
 
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-                Text(
+                const Text(
                   'Candidaturas Submetidas',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Row(
                   children: (listaBadges.isEmpty ? List.filled(2, null) : listaBadges)
                       .take(2)
                       .map<Widget>(
                         (b) => Expanded(
                           child: Padding(
-                            padding: EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.only(right: 8),
                             child: _miniCard(b, showProgress: true),
                           ),
                         ),
@@ -217,12 +233,12 @@ class _MainPageState extends State<MainPage> {
                       .toList(),
                 ),
 
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
+                    const Text(
                       'Badges Recomendados',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
@@ -231,26 +247,29 @@ class _MainPageState extends State<MainPage> {
                         context,
                         MaterialPageRoute(builder: (_) => BadgesPage()),
                       ),
-                      child: Icon(Icons.arrow_forward,
-                          size: 18, color: Colors.black54),
+                      child: const Icon(
+                        Icons.arrow_forward,
+                        size: 18,
+                        color: Colors.black54,
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Row(
                   children: (listaBadges.isEmpty ? List.filled(2, null) : listaBadges)
                       .take(2)
                       .map<Widget>(
                         (b) => Expanded(
                           child: Padding(
-                            padding: EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.only(right: 8),
                             child: _miniCard(b, showProgress: false),
                           ),
                         ),
                       )
                       .toList(),
                 ),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
               ],
             );
           },
@@ -278,7 +297,7 @@ class _MainPageState extends State<MainPage> {
                 }
               },
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     CircleAvatar(
@@ -291,31 +310,31 @@ class _MainPageState extends State<MainPage> {
                                 width: 52,
                                 height: 52,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Icon(
+                                errorBuilder: (_, __, ___) => const Icon(
                                   Icons.person,
                                   color: Colors.purple,
                                   size: 30,
                                 ),
                               )
-                            : Icon(
+                            : const Icon(
                                 Icons.person,
                                 color: Colors.purple,
                                 size: 30,
                               ),
                       ),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           Session.nome,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
-                        Text(
+                        const Text(
                           'Talent Management',
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
@@ -333,41 +352,83 @@ class _MainPageState extends State<MainPage> {
               onTap: () => Navigator.pop(context),
             ),
 
-            _drawerItem(Icons.emoji_events_outlined, 'Catálogo de Badges',
-                onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => BadgesPage()),
-              );
-            }),
+            _drawerItem(
+              Icons.emoji_events_outlined,
+              'Catálogo de Badges',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => BadgesPage()),
+                );
+              },
+            ),
 
-            _drawerItem(Icons.bar_chart, 'Rankings', onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => RankingPage()),
-              );
-            }),
+            _drawerItem(
+              Icons.bar_chart,
+              'Rankings',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => RankingPage()),
+                );
+              },
+            ),
 
             _drawerItem(Icons.assignment_outlined, 'Candidaturas'),
-            _drawerItem(Icons.settings_outlined, 'Configurações'),
+
+            _drawerItem(
+              Icons.settings_outlined,
+              'Configurações',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const OptionsPage()),
+                );
+              },
+            ),
+
             _drawerItem(Icons.calendar_today_outlined, 'Calendário'),
 
-            _drawerItem(Icons.logout, 'Terminar Sessão', onTap: () {
-              Session.terminar();
-              Navigator.pushAndRemoveUntil(
+            _drawerItem(
+              Icons.logout,
+              'Terminar Sessão',
+              onTap: () {
+                Session.terminar();
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => LoginPage()),
+                  (route) => false,
+                );
+              },
+            ),
+
+            const Spacer(),
+            const Divider(),
+            _drawerItem(Icons.info_outline, 'Sobre'),
+            _drawerItem(Icons.help_outline, 'Ajuda', onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => LoginPage()),
-                (route) => false,
+                MaterialPageRoute(builder: (_) => AjudaPage()),
               );
             }),
 
-            Spacer(),
-            Divider(),
-            _drawerItem(Icons.info_outline, 'Sobre'),
-            _drawerItem(Icons.help_outline, 'Ajuda'),
-            SizedBox(height: 8),
+            _drawerItem(
+              Icons.lock_outline,
+              'Change Password',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ChangePasswordPage()),
+                );
+              },
+            ),
+
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -392,7 +453,7 @@ class _MainPageState extends State<MainPage> {
           fontWeight: selected ? FontWeight.bold : FontWeight.normal,
         ),
       ),
-      tileColor: selected ? Color(0xFF2563EB) : null,
+      tileColor: selected ? const Color(0xFF2563EB) : null,
       shape: selected
           ? RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -410,31 +471,33 @@ class _MainPageState extends State<MainPage> {
     final double pct = total > 0 ? (atual / total).clamp(0.0, 1.0) : 0.5;
 
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)],
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 6),
+        ],
       ),
       child: Column(
         children: [
           badge == null || badge['imagemurl'] == null
-              ? Icon(Icons.emoji_events, size: 50, color: Colors.grey)
+              ? const Icon(Icons.emoji_events, size: 50, color: Colors.grey)
               : Image.network(
                   badge['imagemurl'],
                   width: 50,
                   height: 50,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Icon(
+                  errorBuilder: (_, __, ___) => const Icon(
                     Icons.emoji_events,
                     size: 50,
                     color: Colors.grey,
                   ),
                 ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text(
             badge?['nome'] ?? 'Badge',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
               color: Color(0xFF2563EB),
@@ -444,29 +507,29 @@ class _MainPageState extends State<MainPage> {
             overflow: TextOverflow.ellipsis,
           ),
           if (showProgress) ...[
-            SizedBox(height: 6),
+            const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'Progresso',
                   style: TextStyle(fontSize: 10, color: Colors.grey),
                 ),
                 Text(
                   '${(pct * 100).toInt()}%',
-                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
                 ),
               ],
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             LinearProgressIndicator(
               value: pct,
-              backgroundColor: Color(0xFFE5E7EB),
-              color: Color(0xFF2563EB),
+              backgroundColor: const Color(0xFFE5E7EB),
+              color: const Color(0xFF2563EB),
               minHeight: 4,
             ),
-            SizedBox(height: 6),
-            Text(
+            const SizedBox(height: 6),
+            const Text(
               '10 dias restantes',
               style: TextStyle(fontSize: 10, color: Colors.grey),
             ),

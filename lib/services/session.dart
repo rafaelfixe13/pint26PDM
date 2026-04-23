@@ -9,8 +9,9 @@ class Session {
     utilizador = {};
   }
 
-  static int get id => utilizador['idutilizador'] ?? 0;
-  static String get nome => utilizador['nome'] ?? '';
-  static String get email => utilizador['email'] ?? '';
-  static String get fotoUrl => utilizador['fotourl'] ?? '';
+  static int get id => int.tryParse('${utilizador['idutilizador'] ?? 0}') ?? 0;
+  static String get nome => utilizador['nome']?.toString() ?? '';
+  static String get email => utilizador['email']?.toString() ?? '';
+  static String get fotoUrl => utilizador['fotourl']?.toString() ?? '';
+  static int get pontos => int.tryParse('${utilizador['pontos'] ?? 0}') ?? 0;
 }

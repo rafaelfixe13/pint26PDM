@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pinttest/screens/change_password.dart';
+import 'package:pinttest/services/api_service.dart';
+import 'package:pinttest/services/session.dart';
 
 class OptionsPage extends StatefulWidget {
   const OptionsPage({super.key});
@@ -11,10 +13,59 @@ class OptionsPage extends StatefulWidget {
 class _OptionsPageState extends State<OptionsPage> {
   bool notificacoes = true;
   bool notificacoesEmail = true;
-  bool notificacoesSmartphone = false;
-  bool alertasBadges = false;
   bool resultadosCandidatura = true;
-  bool rgpd = true;
+  bool _rgpd = false;
+  bool _aGuardarRgpd = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _rgpd = Session.utilizador['rgpd'] == true;
+  }
+
+  Future<void> _atualizarRgpd(bool value) async {
+    setState(() {
+      _aGuardarRgpd = true;
+      _rgpd = value;
+    });
+
+    try {
+      final novoValor = await ApiService.atualizarRgpd(value);
+
+      if (!mounted) return;
+      setState(() {
+        _rgpd = novoValor;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            novoValor
+                ? 'Consentimento RGPD ativado com sucesso.'
+                : 'Consentimento RGPD desativado com sucesso.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _rgpd = !_rgpd;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao atualizar RGPD: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _aGuardarRgpd = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,12 +98,6 @@ class _OptionsPageState extends State<OptionsPage> {
           }),
           _switchRow('Notificações por email', notificacoesEmail, (v) {
             setState(() => notificacoesEmail = v);
-          }),
-          _switchRow('Notificações no smartphone', notificacoesSmartphone, (v) {
-            setState(() => notificacoesSmartphone = v);
-          }),
-          _switchRow('Alertas de expiração de badges', alertasBadges, (v) {
-            setState(() => alertasBadges = v);
           }),
           _switchRow('Resultados de uma candidatura', resultadosCandidatura, (v) {
             setState(() => resultadosCandidatura = v);
@@ -89,20 +134,6 @@ class _OptionsPageState extends State<OptionsPage> {
               );
             },
           ),
-          const SizedBox(height: 12),
-
-          _actionButton(
-            icon: '🔐',
-            text: 'Autenticação em 2 passos (ativar)',
-            onTap: () {},
-          ),
-          const SizedBox(height: 12),
-
-          _actionButton(
-            icon: '📱',
-            text: 'Gerir dispositivos com sessão ativa',
-            onTap: () {},
-          ),
 
           const SizedBox(height: 24),
 
@@ -115,19 +146,36 @@ class _OptionsPageState extends State<OptionsPage> {
           ),
           const SizedBox(height: 12),
 
-          CheckboxListTile(
-            value: rgpd,
-            onChanged: (value) {
-              setState(() => rgpd = value ?? false);
-            },
-            contentPadding: EdgeInsets.zero,
-            activeColor: const Color(0xFF3F6AA3),
-            controlAffinity: ListTileControlAffinity.leading,
-            title: const Text(
-              'Aceitar os termos RGPD',
-              style: TextStyle(fontSize: 15),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Aceitar os termos RGPD',
+                style: TextStyle(fontSize: 15),
+              ),
+              subtitle: const Text(
+                'Autoriza o tratamento dos teus dados conforme a política de privacidade.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              value: _rgpd,
+              onChanged: _aGuardarRgpd ? null : _atualizarRgpd,
+              activeColor: const Color(0xFF3F6AA3),
             ),
           ),
+
+          if (_aGuardarRgpd)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
         ],
       ),
     );
