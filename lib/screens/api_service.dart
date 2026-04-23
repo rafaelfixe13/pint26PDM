@@ -12,9 +12,11 @@ class ApiService {
 
   static dynamic _decodeJsonSafely(http.Response response) {
     final body = response.body.trim();
-    if (_isJson(body)) return jsonDecode(body);
+    if (_isJson(body)) {
+      return jsonDecode(body);
+    }
     throw Exception(
-      'Resposta inválida do servidor (${response.statusCode}). O servidor devolveu HTML ou texto em vez de JSON.',
+      'Resposta inválida do servidor (${response.statusCode}). O servidor devolveu HTML ou texto em vez de JSON.',
     );
   }
 
@@ -23,6 +25,7 @@ class ApiService {
     String fallback = 'Ocorreu um erro',
   }) {
     final body = response.body.trim();
+
     if (_isJson(body)) {
       final data = jsonDecode(body);
       if (data is Map<String, dynamic>) {
@@ -31,9 +34,11 @@ class ApiService {
             fallback;
       }
     }
+
     if (body.isNotEmpty) {
-      return 'Erro ${response.statusCode}: resposta inválida do servidor';
+      return 'Erro ${response.statusCode}: resposta inválida do servidor';
     }
+
     return fallback;
   }
 
@@ -42,9 +47,11 @@ class ApiService {
       Uri.parse('$baseUrl/badges'),
       headers: {'Accept': 'application/json'},
     );
+
     if (response.statusCode == 200) {
       return _decodeJsonSafely(response) as List;
     }
+
     throw Exception(
       _extractErrorMessage(response, fallback: 'Erro ao carregar badges'),
     );
@@ -53,7 +60,7 @@ class ApiService {
   static Future<List<dynamic>> getBadgesDoUtilizador() async {
     final userId = Session.id;
     if (userId == 0) {
-      throw Exception('Sessão inválida. Faz login novamente.');
+      throw Exception('Sessão inválida. Faz login novamente.');
     }
 
     final response = await http.get(
@@ -78,9 +85,11 @@ class ApiService {
       Uri.parse('$baseUrl/utilizadores'),
       headers: {'Accept': 'application/json'},
     );
+
     if (response.statusCode == 200) {
       return _decodeJsonSafely(response) as List;
     }
+
     throw Exception(
       _extractErrorMessage(response, fallback: 'Erro ao carregar utilizadores'),
     );
@@ -91,11 +100,43 @@ class ApiService {
       Uri.parse('$baseUrl/utilizadores/ranking'),
       headers: {'Accept': 'application/json'},
     );
+
     if (response.statusCode == 200) {
       return _decodeJsonSafely(response) as List;
     }
+
     throw Exception(
       _extractErrorMessage(response, fallback: 'Erro ao carregar ranking'),
+    );
+  }
+
+  static Future<List<dynamic>> getCandidaturas() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/candidaturas'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as List;
+    }
+
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao carregar candidaturas'),
+    );
+  }
+
+  static Future<Map<String, dynamic>> getBadgeById(int badgeId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/badges/$badgeId'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as Map<String, dynamic>;
+    }
+
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao carregar badge'),
     );
   }
 
@@ -107,29 +148,39 @@ class ApiService {
       'PATCH',
       Uri.parse('$baseUrl/utilizadores/$idUtilizador/foto'),
     );
+
     request.headers.addAll({'Accept': 'application/json'});
-    request.files.add(await http.MultipartFile.fromPath('foto', caminhoFicheiro));
+    request.files.add(
+      await http.MultipartFile.fromPath('foto', caminhoFicheiro),
+    );
+
     final response = await request.send();
     final body = await response.stream.bytesToString();
 
     if (response.statusCode == 200) {
       if (!_isJson(body)) {
-        throw Exception('Resposta inválida do servidor ao atualizar foto.');
+        throw Exception('Resposta inválida do servidor ao atualizar foto.');
       }
+
       final data = jsonDecode(body);
       String fotoUrl = data['fotourl'];
+
       fotoUrl = fotoUrl
           .replaceAll('localhost', '10.0.2.2')
           .replaceAll('127.0.0.1', '10.0.2.2')
           .replaceAll('100.105.58.22', '10.0.2.2')
           .replaceAll('0.0.0.0', '10.0.2.2');
+
       return fotoUrl;
     }
 
     throw Exception('Erro ao atualizar foto');
   }
 
-  static Future<Map<String, dynamic>> login(String email, String password) async {
+  static Future<Map<String, dynamic>> login(
+    String email,
+    String password,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/login'),
       headers: {
@@ -146,7 +197,9 @@ class ApiService {
       return _decodeJsonSafely(response) as Map<String, dynamic>;
     }
 
-    throw Exception(_extractErrorMessage(response, fallback: 'Erro ao fazer login'));
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao fazer login'),
+    );
   }
 
   static Future<Map<String, dynamic>> registro(
@@ -171,7 +224,9 @@ class ApiService {
       return _decodeJsonSafely(response) as Map<String, dynamic>;
     }
 
-    throw Exception(_extractErrorMessage(response, fallback: 'Erro ao registar'));
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao registar'),
+    );
   }
 
   static Future<void> logout() async {
@@ -187,7 +242,7 @@ class ApiService {
   ) async {
     final userId = Session.id;
     if (userId == 0) {
-      throw Exception('Sessão inválida. Faz login novamente.');
+      throw Exception('Sessão inválida. Faz login novamente.');
     }
 
     final response = await http.post(
@@ -222,7 +277,41 @@ class ApiService {
     }
 
     throw Exception(
-      'Erro ${response.statusCode}: o servidor devolveu HTML ou texto inválido.',
+      'Erro ${response.statusCode}: o servidor devolveu HTML ou texto inválido.',
+    );
+  }
+
+  static Future<bool> atualizarRgpd(bool valor) async {
+    final userId = Session.id;
+    if (userId == 0) {
+      throw Exception('Sessão inválida. Faz login novamente.');
+    }
+
+    final response = await http.patch(
+      Uri.parse('$baseUrl/utilizadores/$userId/rgpd'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'rgpd': valor,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = _decodeJsonSafely(response) as Map<String, dynamic>;
+      final utilizador = Map<String, dynamic>.from(data['utilizador'] ?? {});
+
+      Session.iniciar({
+        ...Session.utilizador,
+        ...utilizador,
+      });
+
+      return utilizador['rgpd'] == true;
+    }
+
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao atualizar RGPD'),
     );
   }
 
@@ -231,11 +320,13 @@ class ApiService {
       Uri.parse('$baseUrl/notificacoes?idutilizador=${Session.id}'),
       headers: {'Accept': 'application/json'},
     );
+
     if (response.statusCode == 200) {
       return _decodeJsonSafely(response) as List;
     }
+
     throw Exception(
-      _extractErrorMessage(response, fallback: 'Erro ao carregar notificações'),
+      _extractErrorMessage(response, fallback: 'Erro ao carregar notificações'),
     );
   }
 
@@ -244,11 +335,12 @@ class ApiService {
       Uri.parse('$baseUrl/notificacoes/$id/lida'),
       headers: {'Accept': 'application/json'},
     );
+
     if (response.statusCode != 200) {
       throw Exception(
         _extractErrorMessage(
           response,
-          fallback: 'Erro ao marcar notificação como lida',
+          fallback: 'Erro ao marcar notificação como lida',
         ),
       );
     }
@@ -259,9 +351,10 @@ class ApiService {
       Uri.parse('$baseUrl/notificacoes/$id'),
       headers: {'Accept': 'application/json'},
     );
+
     if (response.statusCode != 200) {
       throw Exception(
-        _extractErrorMessage(response, fallback: 'Erro ao apagar notificação'),
+        _extractErrorMessage(response, fallback: 'Erro ao apagar notificação'),
       );
     }
   }
@@ -271,11 +364,12 @@ class ApiService {
       Uri.parse('$baseUrl/notificacoes/marcar-todas?idutilizador=${Session.id}'),
       headers: {'Accept': 'application/json'},
     );
+
     if (response.statusCode != 200) {
       throw Exception(
         _extractErrorMessage(
           response,
-          fallback: 'Erro ao marcar todas as notificações como lidas',
+          fallback: 'Erro ao marcar todas as notificações como lidas',
         ),
       );
     }

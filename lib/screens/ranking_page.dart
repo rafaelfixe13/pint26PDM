@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:pinttest/services/api_service.dart';
-import 'package:pinttest/services/session.dart';
+import '../services/api_service.dart';
+import '../services/session.dart';
 
 class RankingPage extends StatefulWidget {
   @override
