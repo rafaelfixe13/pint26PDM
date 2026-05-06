@@ -19,13 +19,21 @@ const pool = new Pool({
   port: 5432,
 });
 
-// ─── UPLOADS ─────────────────────────────────────────────
+// ─── PASTAS DE UPLOAD ────────────────────────────────────
 if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
+if (!fs.existsSync("./uploads/candidaturas")) fs.mkdirSync("./uploads/candidaturas");
 
+// ─── STORAGE MULTER ──────────────────────────────────────
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "./uploads/"),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + path.extname(file.originalname)),
+  destination: (req, file, cb) => cb(null, "./uploads/candidaturas"),
+  filename: (req, file, cb) => {
+    const nome =
+      Date.now() +
+      "-" +
+      Math.round(Math.random() * 1e9) +
+      path.extname(file.originalname);
+    cb(null, nome);
+  },
 });
 
 const upload = multer({ storage });
@@ -37,11 +45,216 @@ app.use("/uploads", express.static("uploads"));
 // ─────────────────────────────────────────────────────────
 app.get("/badges", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM badges");
+    const result = await pool.query("SELECT * FROM badges ORDER BY idbadge ASC");
     res.json(result.rows);
   } catch (err) {
     console.error("Erro ao buscar badges:", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/badges/:id/requisitos", async (req, res) => {
+  try {
+    const badgeId = parseInt(req.params.id, 10);
+
+    if (isNaN(badgeId)) {
+      return res.status(400).json({ error: "ID do badge inválido" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        idrequisito,
+        idbadge,
+        codigo,
+        titulo,
+        descricao,
+        imagemurl,
+        ordem,
+        ativo,
+        datacriacao,
+        ultimaatualizacao
+      FROM requisitos
+      WHERE idbadge = $1
+        AND ativo = TRUE
+      ORDER BY ordem ASC, idrequisito ASC
+      `,
+      [badgeId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao carregar requisitos:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// CANDIDATURAS
+// ─────────────────────────────────────────────────────────
+app.get("/candidaturas", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        cb.idcandidatura,
+        cb.user_id,
+        cb.badge_id,
+        cb.estado,
+        cb.datasubmissao,
+        cb.comentariogeral,
+        cb.datacriacao,
+        b.idbadge,
+        b.nome,
+        b.descricao,
+        b.imagemurl,
+        b.nivel,
+        b.pontos,
+        b.linkpublicobase,
+        b.competencias
+      FROM candidaturasbadge cb
+      INNER JOIN badges b ON b.idbadge = cb.badge_id
+      ORDER BY cb.datacriacao DESC
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao carregar candidaturas:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/candidaturas", upload.any(), async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const userId = parseInt(req.body.user_id, 10);
+    const badgeId = parseInt(req.body.badge_id, 10);
+
+    if (isNaN(userId) || isNaN(badgeId)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "user_id ou badge_id inválido" });
+    }
+
+    const files = req.files || [];
+    if (!files.length) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Nenhum ficheiro enviado" });
+    }
+
+    // 1) criar ou reutilizar candidatura principal
+    const candidaturaExistente = await client.query(
+      `
+      SELECT idcandidatura
+      FROM candidaturasbadge
+      WHERE user_id = $1 AND badge_id = $2
+      LIMIT 1
+      `,
+      [userId, badgeId]
+    );
+
+    let idCandidatura;
+
+    if (candidaturaExistente.rows.length > 0) {
+      idCandidatura = candidaturaExistente.rows[0].idcandidatura;
+
+      await client.query(
+        `
+        UPDATE candidaturasbadge
+        SET estado = 'SUBMITTED',
+            datasubmissao = NOW()
+        WHERE idcandidatura = $1
+        `,
+        [idCandidatura]
+      );
+    } else {
+      const candidaturaResult = await client.query(
+        `
+        INSERT INTO candidaturasbadge
+        (user_id, badge_id, estado, datasubmissao, datacriacao)
+        VALUES ($1, $2, 'SUBMITTED', NOW(), NOW())
+        RETURNING idcandidatura
+        `,
+        [userId, badgeId]
+      );
+
+      idCandidatura = candidaturaResult.rows[0].idcandidatura;
+    }
+
+    // 2) processar cada ficheiro/requisito
+    for (const file of files) {
+      const fieldName = file.fieldname; // ficheiro_0, ficheiro_1...
+      const index = fieldName.split("_")[1];
+      const requisitoId = parseInt(req.body[`requisito_id_${index}`], 10);
+
+      if (isNaN(requisitoId)) continue;
+
+      // procurar se já existe linha na candidaturasrequisitos
+      const candReqExistente = await client.query(
+        `
+        SELECT idcandidaturareq
+        FROM candidaturasrequisitos
+        WHERE idcandidatura = $1 AND idrequisito = $2
+        LIMIT 1
+        `,
+        [idCandidatura, requisitoId]
+      );
+
+      let idCandidaturaReq;
+
+      if (candReqExistente.rows.length > 0) {
+        idCandidaturaReq = candReqExistente.rows[0].idcandidaturareq;
+
+        await client.query(
+          `
+          DELETE FROM evidencias
+          WHERE idcandidaturareq = $1
+          `,
+          [idCandidaturaReq]
+        );
+      } else {
+        const candReqResult = await client.query(
+          `
+          INSERT INTO candidaturasrequisitos
+          (idcandidatura, idrequisito)
+          VALUES ($1, $2)
+          RETURNING idcandidaturareq
+          `,
+          [idCandidatura, requisitoId]
+        );
+
+        idCandidaturaReq = candReqResult.rows[0].idcandidaturareq;
+      }
+
+      // 3) inserir evidência associada ao candidaturasrequisitos
+      await client.query(
+        `
+        INSERT INTO evidencias
+        (idcandidaturareq, ficheirourl, descricao, dataupload)
+        VALUES ($1, $2, $3, NOW())
+        `,
+        [
+          idCandidaturaReq,
+          `http://100.105.58.22:3000/uploads/candidaturas/${file.filename}`,
+          file.originalname,
+        ]
+      );
+    }
+
+    await client.query("COMMIT");
+
+    res.status(200).json({
+      success: true,
+      message: "Candidatura submetida com sucesso",
+      idcandidatura: idCandidatura,
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Erro ao submeter candidatura:", err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -60,7 +273,6 @@ app.get("/utilizadores", async (req, res) => {
   }
 });
 
-// GET badges conquistados por utilizador
 app.get("/utilizadores/:id/badges", async (req, res) => {
   try {
     const idUtilizador = parseInt(req.params.id, 10);
@@ -80,7 +292,7 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
         ub.created_at,
         ub.updated_at
       FROM utilizador_badge ub
-      INNER JOIN badges b ON b.idbadge = ub.badge_id
+      INNER JOIN badge b ON b.idbadge = ub.badge_id
       WHERE ub.user_id = $1
         AND ub.conquistado = TRUE
       ORDER BY ub.data_conquista DESC NULLS LAST, ub.id ASC
@@ -95,14 +307,13 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
   }
 });
 
-// PATCH — atualizar foto do utilizador
 app.patch("/utilizadores/:id/foto", upload.single("foto"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "Nenhuma imagem enviada" });
     }
 
-    const fotoUrl = `http://100.105.58.22:3000/uploads/${req.file.filename}`;
+    const fotoUrl = `http://100.105.58.22:3000/uploads/candidaturas/${req.file.filename}`;
 
     await pool.query(
       "UPDATE utilizadores SET fotourl = $1 WHERE idutilizador = $2",
@@ -116,7 +327,6 @@ app.patch("/utilizadores/:id/foto", upload.single("foto"), async (req, res) => {
   }
 });
 
-// GET /utilizadores/ranking
 app.get("/utilizadores/ranking", async (req, res) => {
   try {
     const result = await pool.query(`
@@ -131,7 +341,6 @@ app.get("/utilizadores/ranking", async (req, res) => {
   }
 });
 
-// rdpd
 app.patch("/utilizadores/:id/rgpd", async (req, res) => {
   try {
     const idUtilizador = parseInt(req.params.id, 10);
@@ -141,18 +350,14 @@ app.patch("/utilizadores/:id/rgpd", async (req, res) => {
       return res.status(400).json({ error: "ID do utilizador inválido" });
     }
 
-    if (typeof rgpd !== "boolean") {
-      return res.status(400).json({ error: "O campo rgpd tem de ser boolean" });
-    }
-
     const result = await pool.query(
       `
       UPDATE utilizadores
       SET rgpd = $1
       WHERE idutilizador = $2
-      RETURNING idutilizador, nome, email, rgpd
+      RETURNING idutilizador, nome, email, fotourl, pontos, rgpd
       `,
-      [rgpd, idUtilizador]
+      [rgpd === true, idUtilizador]
     );
 
     if (result.rows.length === 0) {
@@ -170,7 +375,7 @@ app.patch("/utilizadores/:id/rgpd", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────
-// AUTH — LOGIN
+// AUTH
 // ─────────────────────────────────────────────────────────
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
@@ -204,9 +409,6 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────
-// AUTH — REGISTO
-// ─────────────────────────────────────────────────────────
 app.post("/registro", async (req, res) => {
   const { nome, email, password } = req.body;
 
@@ -243,9 +445,6 @@ app.post("/registro", async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────
-// AUTH — ALTERAR PASSWORD
-// ─────────────────────────────────────────────────────────
 app.post("/alterar-password", async (req, res) => {
   const { idutilizador, passwordAtual, passwordNova } = req.body;
 
@@ -295,9 +494,6 @@ app.post("/alterar-password", async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────
-// AUTH — LOGOUT
-// ─────────────────────────────────────────────────────────
 app.post("/logout", (req, res) => {
   res.json({ success: true, message: "Sessão terminada" });
 });
@@ -320,7 +516,6 @@ app.get("/notificacoes", async (req, res) => {
   }
 });
 
-// PATCH — marcar todas como lidas
 app.patch("/notificacoes/marcar-todas", async (req, res) => {
   const idutilizador = req.query.idutilizador ?? 1;
 
@@ -336,7 +531,6 @@ app.patch("/notificacoes/marcar-todas", async (req, res) => {
   }
 });
 
-// PATCH — marcar uma como lida
 app.patch("/notificacoes/:id/lida", async (req, res) => {
   try {
     await pool.query(
@@ -350,7 +544,6 @@ app.patch("/notificacoes/:id/lida", async (req, res) => {
   }
 });
 
-// DELETE — apagar notificação
 app.delete("/notificacoes/:id", async (req, res) => {
   try {
     await pool.query(
@@ -360,43 +553,6 @@ app.delete("/notificacoes/:id", async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error("Erro ao apagar notificação:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
-// ─────────────────────────────────────────────────────────
-// Candidaturas
-// ─────────────────────────────────────────────────────────
-
-app.get("/candidaturas", async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT
-        cb.idcandidatura,
-        cb.user_id,
-        cb.badge_id,
-        cb.estado,
-        cb.datasubmissao,
-        cb.comentariogeral,
-        cb.datacriacao,
-        b.idbadge,
-        b.nome,
-        b.descricao,
-        b.imagemurl,
-        b.nivel,
-        b.pontos,
-        b.linkpublicobase,
-        b.competencias
-      FROM candidaturasbadge cb
-      INNER JOIN badges b ON b.idbadge = cb.badge_id
-      WHERE cb.user_id = 1
-      ORDER BY cb.datacriacao DESC
-    `);
-
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Erro ao carregar candidaturas:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
