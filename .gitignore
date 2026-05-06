@@ -13,7 +13,8 @@ android/
 windows/
 macos/
 linux/
-
+web/
+test
 # Node.js
 node_modules/
 lib/node_modules/
@@ -42,3 +43,7 @@ yarn-error.log*
 .plugin_symlinks/
 .history/
 uploads/
+.metadata
+analysis_options.yaml
+.flutter-plugins-dependencies
+.flutter-plugins
