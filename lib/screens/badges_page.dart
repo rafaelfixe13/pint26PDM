@@ -50,7 +50,7 @@ class _BadgesPageState extends State<BadgesPage> {
 
   void _loadData() {
     setState(() {
-      _badgesFuture = ApiService.getBadges();
+      _badgesFuture = ApiService.getBadgesDoUtilizador();
     });
     _badgesFuture.then((lista) {
       setState(() {

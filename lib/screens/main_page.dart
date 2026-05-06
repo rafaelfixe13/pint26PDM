@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:pinttest/screens/help_page.dart';
-import 'package:pinttest/services/api_service.dart';
-import 'package:pinttest/services/session.dart';
-import 'package:pinttest/screens/badges_page.dart';
-import 'package:pinttest/screens/profile_page.dart';
-import 'package:pinttest/screens/notifications_page.dart';
-import 'package:pinttest/screens/login_page.dart';
-import 'package:pinttest/screens/ranking_page.dart';
-import 'package:pinttest/screens/options_page.dart';
-import 'package:pinttest/screens/change_password.dart';
+import './help_page.dart';
+import '../services/api_service.dart';
+import '../services/session.dart';
+import './badges_page.dart';
+import './profile_page.dart';
+import './notifications_page.dart';
+import './login_page.dart';
+import './ranking_page.dart';
+import './options_page.dart';
+import './change_password.dart';
 
 class MainPage extends StatefulWidget {
   @override

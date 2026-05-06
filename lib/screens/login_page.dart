@@ -111,60 +111,69 @@ class _LoginPageState extends State<LoginPage> {
                         letterSpacing: 3)),
               ),
               SizedBox(height: 40),
-              Text('Email',
-                  style:
-                      TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              SizedBox(height: 8),
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'xxx@softinsa.pt',
-                  hintStyle: TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: Color(0xFFF1F5F9),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                ),
-              ),
-              SizedBox(height: 20),
-              Text('Password',
-                  style:
-                      TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              SizedBox(height: 8),
-              TextField(
-                controller: _passwordController,
-                obscureText: !_verPassword,
-                decoration: InputDecoration(
-                  hintText: 'Introduza a sua password',
-                  hintStyle: TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: Color(0xFFF1F5F9),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                        _verPassword
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        color: Colors.grey),
-                    onPressed: () =>
-                        setState(() => _verPassword = !_verPassword),
-                  ),
+              AutofillGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Email',
+                        style:
+                            TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                    SizedBox(height: 8),
+                    TextField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.email],
+                      decoration: InputDecoration(
+                        hintText: 'xxx@softinsa.pt',
+                        hintStyle: TextStyle(color: Colors.grey),
+                        filled: true,
+                        fillColor: Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    Text('Password',
+                        style:
+                            TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                    SizedBox(height: 8),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: !_verPassword,
+                      autofillHints: const [AutofillHints.password],
+                      decoration: InputDecoration(
+                        hintText: 'Introduza a sua password',
+                        hintStyle: TextStyle(color: Colors.grey),
+                        filled: true,
+                        fillColor: Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                              _verPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: Colors.grey),
+                          onPressed: () =>
+                              setState(() => _verPassword = !_verPassword),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               SizedBox(height: 16),

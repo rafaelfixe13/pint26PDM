@@ -385,22 +385,26 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
       `
       SELECT 
         b.*,
-        ub.progresso_atual,
-        ub.progresso_total,
-        ub.conquistado,
-        ub.data_conquista,
-        ub.created_at,
-        ub.updated_at,
+        COALESCE(ub.progresso_atual, 0) as progresso_atual,
+        COALESCE(ub.progresso_total, requisitos_count.total) as progresso_total,
+        COALESCE(ub.conquistado, FALSE) as conquistado,
+        COALESCE(ub.data_conquista, NULL) as data_conquista,
+        COALESCE(ub.created_at, NOW()) as created_at,
+        COALESCE(ub.updated_at, NOW()) as updated_at,
         CASE
-          WHEN ub.progresso_total > 0
-           AND ub.progresso_atual >= ub.progresso_total
+          WHEN COALESCE(ub.progresso_atual, 0) >= COALESCE(ub.progresso_total, requisitos_count.total) 
+          AND requisitos_count.total > 0
             THEN 'Submetido'
-          ELSE CONCAT(ub.progresso_atual, '/', ub.progresso_total)
+          ELSE CONCAT(COALESCE(ub.progresso_atual, 0), '/', COALESCE(ub.progresso_total, requisitos_count.total))
         END AS estado_visual
-      FROM utilizador_badge ub
-      INNER JOIN badges b ON b.idbadge = ub.badge_id
-      WHERE ub.user_id = $1
-      ORDER BY ub.updated_at DESC, ub.id DESC
+      FROM badges b
+      LEFT JOIN utilizador_badge ub ON ub.user_id = $1 AND ub.badge_id = b.idbadge
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int as total
+        FROM requisitos
+        WHERE idbadge = b.idbadge AND ativo = TRUE
+      ) requisitos_count ON true
+      ORDER BY b.idbadge ASC
       `,
       [idUtilizador]
     );

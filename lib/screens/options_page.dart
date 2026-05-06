@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pinttest/screens/change_password.dart';
-import 'package:pinttest/services/api_service.dart';
-import 'package:pinttest/services/session.dart';
+import './change_password.dart';
+import '../services/api_service.dart';
+import '../services/session.dart';
 
 class OptionsPage extends StatefulWidget {
   const OptionsPage({super.key});

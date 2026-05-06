@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:pinttest/services/api_service.dart';
-import 'package:pinttest/screens/badge_detail_page.dart';
+import '../services/api_service.dart';
+import './badge_detail_page.dart';
 
 class CandidaturasPage extends StatefulWidget {
   const CandidaturasPage({super.key});
