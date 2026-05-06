@@ -41,6 +41,78 @@ const upload = multer({ storage });
 app.use("/uploads", express.static("uploads"));
 
 // ─────────────────────────────────────────────────────────
+// FUNÇÃO AUXILIAR: CALCULAR PROGRESSO DO BADGE
+// ─────────────────────────────────────────────────────────
+async function calcularProgressoBadge(client, userId, badgeId, idCandidatura) {
+  const totalReqResult = await client.query(
+    `
+    SELECT COUNT(*)::int AS total
+    FROM requisitos
+    WHERE idbadge = $1
+      AND ativo = TRUE
+    `,
+    [badgeId]
+  );
+
+  const progressoTotal = totalReqResult.rows[0]?.total ?? 0;
+
+  const progressoAtualResult = await client.query(
+    `
+    SELECT COUNT(DISTINCT cr.idrequisito)::int AS total
+    FROM candidaturasrequisitos cr
+    INNER JOIN evidencias e
+      ON e.idcandidaturareq = cr.idcandidaturareq
+    INNER JOIN requisitos r
+      ON r.idrequisito = cr.idrequisito
+    WHERE cr.idcandidatura = $1
+      AND r.idbadge = $2
+      AND r.ativo = TRUE
+    `,
+    [idCandidatura, badgeId]
+  );
+
+  const progressoAtual = progressoAtualResult.rows[0]?.total ?? 0;
+  const submetido = progressoTotal > 0 && progressoAtual >= progressoTotal;
+  const estadoVisual = submetido
+    ? "Submetido"
+    : `${progressoAtual}/${progressoTotal}`;
+
+  await client.query(
+    `
+    UPDATE candidaturasbadge
+    SET progresso_atual = $2,
+        progresso_total = $3,
+        estado = 'SUBMITTED',
+        datasubmissao = NOW()
+    WHERE idcandidatura = $1
+    `,
+    [idCandidatura, progressoAtual, progressoTotal]
+  );
+
+  await client.query(
+    `
+    INSERT INTO utilizador_badge
+      (user_id, badge_id, progresso_atual, progresso_total, conquistado, data_conquista, created_at, updated_at)
+    VALUES
+      ($1, $2, $3, $4, FALSE, NULL, NOW(), NOW())
+    ON CONFLICT (user_id, badge_id)
+    DO UPDATE SET
+      progresso_atual = EXCLUDED.progresso_atual,
+      progresso_total = EXCLUDED.progresso_total,
+      updated_at = NOW()
+    `,
+    [userId, badgeId, progressoAtual, progressoTotal]
+  );
+
+  return {
+    progressoAtual,
+    progressoTotal,
+    submetido,
+    estadoVisual,
+  };
+}
+
+// ─────────────────────────────────────────────────────────
 // BADGES
 // ─────────────────────────────────────────────────────────
 app.get("/badges", async (req, res) => {
@@ -103,6 +175,14 @@ app.get("/candidaturas", async (req, res) => {
         cb.datasubmissao,
         cb.comentariogeral,
         cb.datacriacao,
+        cb.progresso_atual,
+        cb.progresso_total,
+        CASE
+          WHEN cb.progresso_total > 0
+           AND cb.progresso_atual >= cb.progresso_total
+            THEN 'Submetido'
+          ELSE CONCAT(cb.progresso_atual, '/', cb.progresso_total)
+        END AS estado_visual,
         b.idbadge,
         b.nome,
         b.descricao,
@@ -143,7 +223,18 @@ app.post("/candidaturas", upload.any(), async (req, res) => {
       return res.status(400).json({ error: "Nenhum ficheiro enviado" });
     }
 
-    // 1) criar ou reutilizar candidatura principal
+    const totalReqResult = await client.query(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM requisitos
+      WHERE idbadge = $1
+        AND ativo = TRUE
+      `,
+      [badgeId]
+    );
+
+    const progressoTotal = totalReqResult.rows[0]?.total ?? 0;
+
     const candidaturaExistente = await client.query(
       `
       SELECT idcandidatura
@@ -163,34 +254,33 @@ app.post("/candidaturas", upload.any(), async (req, res) => {
         `
         UPDATE candidaturasbadge
         SET estado = 'SUBMITTED',
-            datasubmissao = NOW()
+            datasubmissao = NOW(),
+            progresso_total = $2
         WHERE idcandidatura = $1
         `,
-        [idCandidatura]
+        [idCandidatura, progressoTotal]
       );
     } else {
       const candidaturaResult = await client.query(
         `
         INSERT INTO candidaturasbadge
-        (user_id, badge_id, estado, datasubmissao, datacriacao)
-        VALUES ($1, $2, 'SUBMITTED', NOW(), NOW())
+        (user_id, badge_id, estado, datasubmissao, datacriacao, progresso_atual, progresso_total)
+        VALUES ($1, $2, 'SUBMITTED', NOW(), NOW(), 0, $3)
         RETURNING idcandidatura
         `,
-        [userId, badgeId]
+        [userId, badgeId, progressoTotal]
       );
 
       idCandidatura = candidaturaResult.rows[0].idcandidatura;
     }
 
-    // 2) processar cada ficheiro/requisito
     for (const file of files) {
-      const fieldName = file.fieldname; // ficheiro_0, ficheiro_1...
+      const fieldName = file.fieldname;
       const index = fieldName.split("_")[1];
       const requisitoId = parseInt(req.body[`requisito_id_${index}`], 10);
 
       if (isNaN(requisitoId)) continue;
 
-      // procurar se já existe linha na candidaturasrequisitos
       const candReqExistente = await client.query(
         `
         SELECT idcandidaturareq
@@ -227,7 +317,6 @@ app.post("/candidaturas", upload.any(), async (req, res) => {
         idCandidaturaReq = candReqResult.rows[0].idcandidaturareq;
       }
 
-      // 3) inserir evidência associada ao candidaturasrequisitos
       await client.query(
         `
         INSERT INTO evidencias
@@ -242,12 +331,23 @@ app.post("/candidaturas", upload.any(), async (req, res) => {
       );
     }
 
+    const progresso = await calcularProgressoBadge(
+      client,
+      userId,
+      badgeId,
+      idCandidatura
+    );
+
     await client.query("COMMIT");
 
     res.status(200).json({
       success: true,
       message: "Candidatura submetida com sucesso",
       idcandidatura: idCandidatura,
+      progresso_atual: progresso.progressoAtual,
+      progresso_total: progresso.progressoTotal,
+      estado_visual: progresso.estadoVisual,
+      submetido: progresso.submetido,
     });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -290,12 +390,17 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
         ub.conquistado,
         ub.data_conquista,
         ub.created_at,
-        ub.updated_at
+        ub.updated_at,
+        CASE
+          WHEN ub.progresso_total > 0
+           AND ub.progresso_atual >= ub.progresso_total
+            THEN 'Submetido'
+          ELSE CONCAT(ub.progresso_atual, '/', ub.progresso_total)
+        END AS estado_visual
       FROM utilizador_badge ub
-      INNER JOIN badge b ON b.idbadge = ub.badge_id
+      INNER JOIN badges b ON b.idbadge = ub.badge_id
       WHERE ub.user_id = $1
-        AND ub.conquistado = TRUE
-      ORDER BY ub.data_conquista DESC NULLS LAST, ub.id ASC
+      ORDER BY ub.updated_at DESC, ub.id DESC
       `,
       [idUtilizador]
     );

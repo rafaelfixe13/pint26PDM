@@ -229,18 +229,10 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
                 final estado = candidatura['estado']?.toString() ?? 'OPEN';
                 final nome = candidatura['nome']?.toString() ?? 'Badge';
                 final descricao = candidatura['descricao']?.toString() ?? '';
-                final comentario = candidatura['comentariogeral']?.toString() ?? '';
+                final comentario =
+                    candidatura['comentariogeral']?.toString() ?? '';
                 final nivel = candidatura['nivel']?.toString() ?? 'N/A';
                 final pontos = candidatura['pontos']?.toString() ?? '0';
-                final atual = int.tryParse(
-                      candidatura['progresso_atual']?.toString() ?? '0',
-                    ) ??
-                    0;
-                final total = int.tryParse(
-                      candidatura['progresso_total']?.toString() ?? '0',
-                    ) ??
-                    0;
-                final progresso = total > 0 ? (atual / total).clamp(0.0, 1.0) : 0.0;
                 final data = _formatarData(
                   candidatura['datasubmissao'] ?? candidatura['datacriacao'],
                 );
@@ -328,33 +320,6 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
                                   ),
                                 ),
                               ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Progresso',
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                Text(
-                                  '$atual/$total',
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            LinearProgressIndicator(
-                              value: progresso,
-                              backgroundColor: const Color(0xFFE5E7EB),
-                              color: const Color(0xFF2563EB),
-                              minHeight: 6,
                             ),
                             if (comentario.isNotEmpty) ...[
                               const SizedBox(height: 14),

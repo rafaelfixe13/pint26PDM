@@ -21,6 +21,7 @@ class _CandidaturaPageState extends State<CandidaturaPage> {
   final ImagePicker _picker = ImagePicker();
   final Map<int, XFile?> _ficheirosPorRequisito = {};
   bool _aSubmeter = false;
+  bool _aSelecionarImagem = false;
 
   int get _badgeId {
     final raw = widget.badge['idbadge'] ?? widget.badge['badge_id'] ?? 0;
@@ -42,16 +43,41 @@ class _CandidaturaPageState extends State<CandidaturaPage> {
   }
 
   Future<void> _selecionarImagem(int idRequisito) async {
-    final XFile? result = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-
-    if (result == null) return;
+    if (_aSelecionarImagem || _aSubmeter) return;
 
     setState(() {
-      _ficheirosPorRequisito[idRequisito] = result;
+      _aSelecionarImagem = true;
     });
+
+    try {
+      final XFile? result = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (result == null) return;
+
+      setState(() {
+        _ficheirosPorRequisito[idRequisito] = result;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao selecionar imagem: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _aSelecionarImagem = false;
+        });
+      } else {
+        _aSelecionarImagem = false;
+      }
+    }
   }
 
   void _removerFicheiro(int idRequisito) {
@@ -217,7 +243,6 @@ class _CandidaturaPageState extends State<CandidaturaPage> {
     final String titulo = req['titulo']?.toString() ?? 'Requisito';
     final String descricao = req['descricao']?.toString() ?? '';
     final String codigo = req['codigo']?.toString() ?? '';
-    final bool obrigatorio = req['ativo'] == true;
     final XFile? ficheiro = _ficheirosPorRequisito[idRequisito];
 
     return Padding(
@@ -251,18 +276,6 @@ class _CandidaturaPageState extends State<CandidaturaPage> {
                 style: const TextStyle(
                   fontSize: 13,
                   color: Colors.grey,
-                ),
-              ),
-            ),
-          if (obrigatorio)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                'Obrigatório',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.redAccent,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -313,7 +326,9 @@ class _CandidaturaPageState extends State<CandidaturaPage> {
                 Column(
                   children: [
                     TextButton.icon(
-                      onPressed: () => _selecionarImagem(idRequisito),
+                      onPressed: (_aSelecionarImagem || _aSubmeter)
+                          ? null
+                          : () => _selecionarImagem(idRequisito),
                       icon: const Icon(
                         Icons.edit_outlined,
                         color: Colors.purple,
@@ -328,7 +343,9 @@ class _CandidaturaPageState extends State<CandidaturaPage> {
                     ),
                     if (ficheiro != null)
                       TextButton(
-                        onPressed: () => _removerFicheiro(idRequisito),
+                        onPressed: _aSubmeter
+                            ? null
+                            : () => _removerFicheiro(idRequisito),
                         child: const Text(
                           'Remover',
                           style: TextStyle(
@@ -451,7 +468,7 @@ class _CandidaturaPageState extends State<CandidaturaPage> {
                               width: double.infinity,
                               height: 52,
                               child: ElevatedButton(
-                                onPressed: _aSubmeter
+                                onPressed: (_aSubmeter || _aSelecionarImagem)
                                     ? null
                                     : () => _submeter(requisitos),
                                 style: ElevatedButton.styleFrom(
