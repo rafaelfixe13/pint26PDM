@@ -71,7 +71,7 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => BadgeDetailPage(badge: candidatura),
+        builder: (_) => BadgeDetailPage(badge: candidatura, candidatura: candidatura),
       ),
     );
   }

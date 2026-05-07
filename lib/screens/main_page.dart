@@ -3,12 +3,14 @@ import './help_page.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
 import './badges_page.dart';
+import './badge_detail_page.dart';
 import './profile_page.dart';
 import './notifications_page.dart';
 import './login_page.dart';
 import './ranking_page.dart';
 import './options_page.dart';
 import './change_password.dart';
+import './candidaturas.dart';
 
 class MainPage extends StatefulWidget {
   @override
@@ -17,6 +19,7 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   late Future<List<dynamic>> _badgesFuture;
+  late Future<List<dynamic>> _candidaturasFuture;
   late Future<List<dynamic>> _notificacoesFuture;
 
   @override
@@ -27,6 +30,7 @@ class _MainPageState extends State<MainPage> {
 
   void _loadData() {
     _badgesFuture = ApiService.getBadges();
+    _candidaturasFuture = ApiService.getCandidaturas();
     _notificacoesFuture = ApiService.getNotificacoes();
     if (mounted) setState(() {});
   }
@@ -122,18 +126,29 @@ class _MainPageState extends State<MainPage> {
       body: RefreshIndicator(
         onRefresh: () async {
           _loadData();
-          await Future.wait([_badgesFuture, _notificacoesFuture]);
+          await Future.wait([_badgesFuture, _candidaturasFuture, _notificacoesFuture]);
         },
         child: FutureBuilder<List<dynamic>>(
           future: _badgesFuture,
           builder: (context, badgeSnap) {
             final listaBadges = badgeSnap.data ?? [];
 
-            return ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              children: [
-                const Text(
+            return FutureBuilder<List<dynamic>>(
+              future: _candidaturasFuture,
+              builder: (context, candidaturaSnap) {
+                final candidaturas = candidaturaSnap.data ?? [];
+                
+                // Create a map of badge IDs to candidaturas for quick lookup
+                final candidaturasByBadgeId = <int, dynamic>{};
+                for (final c in candidaturas) {
+                  candidaturasByBadgeId[c['badge_id'] as int] = c;
+                }
+
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    const Text(
                   'Bom Dia!',
                   style: TextStyle(
                     fontSize: 28,
@@ -220,13 +235,25 @@ class _MainPageState extends State<MainPage> {
                 ),
                 const SizedBox(height: 12),
                 Row(
-                  children: (listaBadges.isEmpty ? List.filled(2, null) : listaBadges)
+                  children: (candidaturas.isEmpty ? List.filled(2, null) : candidaturas)
                       .take(2)
                       .map<Widget>(
-                        (b) => Expanded(
+                        (c) => Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(right: 8),
-                            child: _miniCard(b, showProgress: true),
+                            child: _miniCard(
+                              c,
+                              showProgress: true,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BadgeDetailPage(
+                                    badge: c,
+                                    candidatura: c,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       )
@@ -263,7 +290,19 @@ class _MainPageState extends State<MainPage> {
                         (b) => Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(right: 8),
-                            child: _miniCard(b, showProgress: false),
+                            child: _miniCard(
+                              b,
+                              showProgress: false,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BadgeDetailPage(
+                                    badge: b,
+                                    candidatura: candidaturasByBadgeId[b['idbadge'] as int],
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       )
@@ -271,6 +310,8 @@ class _MainPageState extends State<MainPage> {
                 ),
                 const SizedBox(height: 24),
               ],
+            );
+              },
             );
           },
         ),
@@ -376,7 +417,17 @@ class _MainPageState extends State<MainPage> {
               },
             ),
 
-            _drawerItem(Icons.assignment_outlined, 'Candidaturas'),
+            _drawerItem(
+              Icons.assignment_outlined,
+              'Candidaturas',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CandidaturasPage()),
+                );
+              },
+            ),
 
             _drawerItem(
               Icons.settings_outlined,
@@ -463,14 +514,14 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  Widget _miniCard(dynamic badge, {required bool showProgress}) {
+  Widget _miniCard(dynamic badge, {required bool showProgress, VoidCallback? onTap}) {
     final int atual =
         int.tryParse(badge?['progresso_atual']?.toString() ?? '0') ?? 0;
     final int total =
         int.tryParse(badge?['progresso_total']?.toString() ?? '0') ?? 0;
     final double pct = total > 0 ? (atual / total).clamp(0.0, 1.0) : 0.5;
 
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -537,5 +588,7 @@ class _MainPageState extends State<MainPage> {
         ],
       ),
     );
+
+    return onTap != null ? GestureDetector(onTap: onTap, child: card) : card;
   }
 }

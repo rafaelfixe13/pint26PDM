@@ -164,8 +164,14 @@ app.get("/badges/:id/requisitos", async (req, res) => {
 // ─────────────────────────────────────────────────────────
 // CANDIDATURAS
 // ─────────────────────────────────────────────────────────
-app.get("/candidaturas", async (req, res) => {
+app.get("/utilizadores/:id/candidaturas", async (req, res) => {
   try {
+    const idUtilizador = parseInt(req.params.id, 10);
+
+    if (isNaN(idUtilizador)) {
+      return res.status(400).json({ error: "ID do utilizador inválido" });
+    }
+
     const result = await pool.query(`
       SELECT
         cb.idcandidatura,
@@ -193,8 +199,9 @@ app.get("/candidaturas", async (req, res) => {
         b.competencias
       FROM candidaturasbadge cb
       INNER JOIN badges b ON b.idbadge = cb.badge_id
+      WHERE cb.user_id = $1
       ORDER BY cb.datacriacao DESC
-    `);
+    `, [idUtilizador]);
 
     res.json(result.rows);
   } catch (err) {

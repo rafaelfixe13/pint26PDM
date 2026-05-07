@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../services/session.dart';
 
@@ -111,8 +112,13 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getCandidaturas() async {
+    final userId = Session.id;
+    if (userId == 0) {
+      throw Exception('Sessão inválida. Faz login novamente.');
+    }
+
     final response = await http.get(
-      Uri.parse('$baseUrl/candidaturas'),
+      Uri.parse('$baseUrl/utilizadores/$userId/candidaturas'),
       headers: {'Accept': 'application/json'},
     );
 
@@ -374,4 +380,58 @@ class ApiService {
       );
     }
   }
-}
+  static Future<List<dynamic>> getRequisitosBadge(int badgeId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/badges/$badgeId/requisitos'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        _extractErrorMessage(
+          response,
+          fallback: 'Erro ao carregar requisitos do badge',
+        ),
+      );
+    }
+
+    return _decodeJsonSafely(response);
+  }
+
+  static Future<Map<String, dynamic>> submitCandidatura(
+    int badgeId,
+    Map<int, String> filesMap,
+  ) async {
+    final uri = Uri.parse('$baseUrl/candidaturas');
+    final request = http.MultipartRequest('POST', uri);
+
+    // Add form fields
+    request.fields['user_id'] = Session.id.toString();
+    request.fields['badge_id'] = badgeId.toString();
+
+    // Add files
+    for (final entry in filesMap.entries) {
+      final requisitoId = entry.key;
+      final filePath = entry.value;
+      final file = await http.MultipartFile.fromPath(
+        'file_$requisitoId',
+        filePath,
+      );
+      request.files.add(file);
+      request.fields['requisito_id_$requisitoId'] = requisitoId.toString();
+    }
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception(
+        _extractErrorMessage(
+          response,
+          fallback: 'Erro ao submeter candidatura',
+        ),
+      );
+    }
+
+    return _decodeJsonSafely(response);
+  }}
