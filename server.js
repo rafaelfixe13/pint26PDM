@@ -193,7 +193,6 @@ app.get("/utilizadores/:id/candidaturas", async (req, res) => {
         b.nome,
         b.descricao,
         b.imagemurl,
-        b.nivel,
         b.pontos,
         b.linkpublicobase,
         b.competencias
@@ -398,6 +397,7 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
         COALESCE(ub.data_conquista, NULL) as data_conquista,
         COALESCE(ub.created_at, NOW()) as created_at,
         COALESCE(ub.updated_at, NOW()) as updated_at,
+        cb.estado,
         CASE
           WHEN COALESCE(ub.progresso_atual, 0) >= COALESCE(ub.progresso_total, requisitos_count.total) 
           AND requisitos_count.total > 0
@@ -405,6 +405,7 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
           ELSE CONCAT(COALESCE(ub.progresso_atual, 0), '/', COALESCE(ub.progresso_total, requisitos_count.total))
         END AS estado_visual
       FROM badges b
+      INNER JOIN candidaturasbadge cb ON cb.badge_id = b.idbadge AND cb.user_id = $1 AND cb.estado = 'APPROVED'
       LEFT JOIN utilizador_badge ub ON ub.user_id = $1 AND ub.badge_id = b.idbadge
       LEFT JOIN LATERAL (
         SELECT COUNT(*)::int as total
@@ -502,7 +503,10 @@ app.post("/login", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "SELECT * FROM utilizadores WHERE email = $1",
+      `SELECT u.*, a.nome as area_nome
+       FROM utilizadores u
+       LEFT JOIN areas a ON u.idarea = a.idarea
+       WHERE u.email = $1`,
       [email]
     );
 

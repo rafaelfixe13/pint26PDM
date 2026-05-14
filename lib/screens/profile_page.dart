@@ -188,9 +188,9 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               SizedBox(height: 8),
               _infoCard(
-                icon: Icons.phone_outlined,
-                title: 'Número de Telefone',
-                value: user['telefone']?.toString() ?? '—',
+                icon: Icons.work_outline,
+                title: 'Área',
+                value: user['area_nome']?.toString() ?? '—',
               ),
               SizedBox(height: 8),
               _infoCard(
@@ -337,13 +337,48 @@ class _ProfilePageState extends State<ProfilePage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  nome,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        nome,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade100,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.check,
+                                            color: Colors.green,
+                                            size: 14,
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Aprovado',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.green.shade700,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 SizedBox(height: 6),
                                 Text(
