@@ -209,6 +209,37 @@ app.get("/utilizadores/:id/candidaturas", async (req, res) => {
   }
 });
 
+app.get("/candidaturas/:id/requisitos", async (req, res) => {
+  try {
+    const candidaturaId = parseInt(req.params.id, 10);
+
+    if (isNaN(candidaturaId)) {
+      return res.status(400).json({ error: "ID da candidatura inválido" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT 
+        cr.idcandidaturareq,
+        cr.idrequisito,
+        r.titulo as requisito_titulo,
+        e.ficheirourl as evidencia_url
+      FROM candidaturasrequisitos cr
+      INNER JOIN requisitos r ON r.idrequisito = cr.idrequisito
+      LEFT JOIN evidencias e ON e.idcandidaturareq = cr.idcandidaturareq
+      WHERE cr.idcandidatura = $1
+      ORDER BY r.idrequisito ASC
+      `,
+      [candidaturaId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao carregar requisitos da candidatura:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/candidaturas", upload.any(), async (req, res) => {
   const client = await pool.connect();
 
@@ -331,7 +362,7 @@ app.post("/candidaturas", upload.any(), async (req, res) => {
         `,
         [
           idCandidaturaReq,
-          `http://100.105.58.22:3000/uploads/candidaturas/${file.filename}`,
+          `http://${req.get('host')}/uploads/candidaturas/${file.filename}`,
           file.originalname,
         ]
       );

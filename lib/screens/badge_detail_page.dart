@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import '../services/api_service.dart';
 
 class BadgeDetailPage extends StatefulWidget {
@@ -265,6 +268,7 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
   void _mostrarDialogCandidatura(BuildContext context) {
     final badge = widget.badge;
     final badgeId = badge['idbadge'] as int;
+    final candidaturaId = widget.candidatura?['idcandidatura'] as int?;
 
     selectedFiles = {};
 
@@ -315,6 +319,7 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
             return _CandidaturaDialog(
               badge: badge,
               requisitos: requisitos,
+              candidaturaId: candidaturaId,
               onClose: () => Navigator.pop(context),
             );
           },
@@ -359,11 +364,13 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
 class _CandidaturaDialog extends StatefulWidget {
   final dynamic badge;
   final List<dynamic> requisitos;
+  final int? candidaturaId;
   final VoidCallback onClose;
 
   const _CandidaturaDialog({
     required this.badge,
     required this.requisitos,
+    this.candidaturaId,
     required this.onClose,
   });
 
@@ -373,12 +380,180 @@ class _CandidaturaDialog extends StatefulWidget {
 
 class _CandidaturaDialogState extends State<_CandidaturaDialog> {
   late Map<int, String> selectedFiles;
+  late Map<int, dynamic> submittedRequisitos;
   bool isSubmitting = false;
+  bool isLoadingSubmitted = true;
 
   @override
   void initState() {
     super.initState();
     selectedFiles = {};
+    submittedRequisitos = {};
+    if (widget.candidaturaId != null) {
+      _loadSubmittedRequisitos();
+    } else {
+      isLoadingSubmitted = false;
+    }
+  }
+
+  Future<void> _loadSubmittedRequisitos() async {
+    try {
+      final submitted =
+          await ApiService.getCandidaturaRequisitos(widget.candidaturaId!);
+      if (!mounted) return;
+      setState(() {
+        for (var req in submitted) {
+          submittedRequisitos[req['idrequisito']] = req;
+        }
+        isLoadingSubmitted = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        isLoadingSubmitted = false;
+      });
+    }
+  }
+
+  Future<void> _viewFile(String fileUrl) async {
+    if (fileUrl.isEmpty) return;
+
+    final extension = fileUrl.split('.').last.toLowerCase();
+    final isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension);
+    final isPdf = extension == 'pdf';
+
+    if (isImage) {
+      _showImageViewer(fileUrl);
+    } else if (isPdf) {
+      _downloadAndOpenPdf(fileUrl);
+    } else {
+      // For other file types, try to open with device app
+      try {
+        await launchUrl(Uri.parse(fileUrl));
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Não foi possível abrir o ficheiro')),
+        );
+      }
+    }
+  }
+
+  void _showImageViewer(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              backgroundColor: Colors.black87,
+              leading: IconButton(
+                icon: Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: Text('Ver Imagem', style: TextStyle(color: Colors.white)),
+            ),
+            Expanded(
+              child: Container(
+                color: Colors.black87,
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  headers: const {
+                    'Accept': 'image/*',
+                  },
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            value: progress.expectedTotalBytes != null
+                                ? progress.cumulativeBytesLoaded /
+                                    progress.expectedTotalBytes!
+                                : null,
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'A carregar...',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red, size: 48),
+                          SizedBox(height: 16),
+                          Text(
+                            'Erro ao carregar imagem',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            error.toString(),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadAndOpenPdf(String pdfUrl) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('A descarregar PDF...')),
+      );
+
+      final response = await http.get(Uri.parse(pdfUrl));
+
+      if (response.statusCode == 200) {
+        final tempDir = await getTemporaryDirectory();
+        final fileName = pdfUrl.split('/').last;
+        final file = File('${tempDir.path}/$fileName');
+
+        await file.writeAsBytes(response.bodyBytes);
+
+        final result = await OpenFile.open(file.path);
+
+        if (result.type != ResultType.done) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Não foi possível abrir o PDF')),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao descarregar ficheiro')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   Future<void> _pickFile(int requisitoId) async {
@@ -467,58 +642,134 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
             SizedBox(height: 16),
-            ...widget.requisitos.map((req) {
-              final reqId = req['idrequisito'] as int;
-              final reqNome = req['nome'] as String? ?? 'Requisito $reqId';
-              final hasFile = selectedFiles.containsKey(reqId);
+            if (isLoadingSubmitted)
+              Center(child: CircularProgressIndicator())
+            else
+              ...widget.requisitos.map((req) {
+                final reqId = req['idrequisito'] as int;
+                final reqNome = req['titulo'] as String? ?? 'Requisito $reqId';
+                final hasNewFile = selectedFiles.containsKey(reqId);
+                final submitted = submittedRequisitos[reqId];
+                final hasSubmitted = submitted != null;
 
-              return Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(reqNome, style: TextStyle(fontWeight: FontWeight.w600)),
-                    SizedBox(height: 6),
-                    GestureDetector(
-                      onTap: () => _pickFile(reqId),
-                      child: Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: hasFile ? Color(0xFF2563EB) : Colors.grey.shade300,
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                          color: hasFile ? Color(0xFFEFF6FF) : Colors.transparent,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              hasFile ? Icons.check_circle : Icons.upload_file,
-                              color: hasFile ? Color(0xFF2563EB) : Colors.grey,
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                hasFile
-                                    ? selectedFiles[reqId]!.split('/').last
-                                    : 'Clica para selecionar ficheiro',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: hasFile ? Colors.black : Colors.grey,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                return Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(reqNome, style: TextStyle(fontWeight: FontWeight.w600)),
+                          if (hasSubmitted)
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check, color: Colors.green, size: 14),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Submetido',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.green.shade700,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                        ],
+                      ),
+                      SizedBox(height: 6),
+                      if (hasSubmitted)
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(10),
+                          margin: EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.green.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.green.shade50,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ficheiro anterior:',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              GestureDetector(
+                                onTap: () {
+                                  final url = submitted['evidencia_url']?.toString();
+                                  if (url != null && url.isNotEmpty) {
+                                    _viewFile(url);
+                                  }
+                                },
+                                child: Text(
+                                  submitted['evidencia_url']?.toString() ?? 'Ficheiro não disponível',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.blue.shade700,
+                                    fontWeight: FontWeight.w500,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      GestureDetector(
+                        onTap: () => _pickFile(reqId),
+                        child: Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: hasNewFile ? Color(0xFF2563EB) : Colors.grey.shade300,
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            color: hasNewFile ? Color(0xFFEFF6FF) : Colors.transparent,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                hasNewFile ? Icons.check_circle : Icons.upload_file,
+                                color: hasNewFile ? Color(0xFF2563EB) : Colors.grey,
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  hasNewFile
+                                      ? selectedFiles[reqId]!.split('/').last
+                                      : 'Clica para ${hasSubmitted ? 'atualizar' : 'selecionar'} ficheiro',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: hasNewFile ? Colors.black : Colors.grey,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+                    ],
+                  ),
+                );
+              }).toList(),
           ],
         ),
       ),

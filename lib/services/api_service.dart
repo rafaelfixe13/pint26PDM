@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import '../services/session.dart';
 
 class ApiService {
-  static const String baseUrl = "http://10.0.2.2:3000";
+  static const String baseUrl = "http://192.168.1.225:3000";
 
   static bool _isJson(String body) {
     final text = body.trim();
@@ -434,4 +434,22 @@ class ApiService {
     }
 
     return _decodeJsonSafely(response);
+  }
+
+  static Future<List<dynamic>> getCandidaturaRequisitos(int candidaturaId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/candidaturas/$candidaturaId/requisitos'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as List;
+    }
+
+    throw Exception(
+      _extractErrorMessage(
+        response,
+        fallback: 'Erro ao carregar requisitos da candidatura',
+      ),
+    );
   }}
