@@ -1,27 +1,26 @@
 import 'package:go_router/go_router.dart';
-import 'package:pint26pmd/screens/about_page.dart';
-import 'package:pint26pmd/screens/badge_detail_page.dart';
-import 'screens/login_page.dart';
-import 'screens/main_page.dart';
-import 'screens/profile_page.dart';
-import 'screens/notifications_page.dart';
-import 'screens/help_page.dart';
-import 'screens/ranking_page.dart';
-import 'screens/candidaturas.dart';
-import 'screens/badges_page.dart';
-import 'screens/options_page.dart';
-import 'screens/change_password.dart';
-
+import 'lib/screens/about_page.dart';
+import 'lib/screens/badge_detail_page.dart';
+import 'lib/screens/login_page.dart';
+import 'lib/screens/main_page.dart';
+import 'lib/screens/profile_page.dart';
+import 'lib/screens/notifications_page.dart';
+import 'lib/screens/help_page.dart';
+import 'lib/screens/ranking_page.dart';
+import 'lib/screens/candidaturas.dart';
+import 'lib/screens/badges_page.dart';
+import 'lib/screens/options_page.dart';
+import 'lib/screens/change_password.dart';
 final GoRouter router = GoRouter(
   initialLocation: '/',
   routes: [
     GoRoute(
       path: '/',
-      builder: (context, state) => const LoginPage(),
+      builder: (context, state) =>  LoginPage(),
     ),
     GoRoute(
       path: '/main',
-      builder: (context, state) => const MainPage(),
+      builder: (context, state) =>  MainPage(),
     ),
     GoRoute(
       path: '/profile',
@@ -41,7 +40,7 @@ final GoRouter router = GoRouter(
     ),
     GoRoute(
       path: '/ranking',
-      builder: (context, state) => const RankingPage(),
+      builder: (context, state) =>  RankingPage(),
     ),
     GoRoute(
       path: '/options',
@@ -53,7 +52,7 @@ final GoRouter router = GoRouter(
     ),
     GoRoute(
       path: '/badges',
-      builder: (context, state) => const BadgesPage(),
+      builder: (context, state) =>  BadgesPage(),
     ),
     GoRoute(
       path: '/badge_detail',
