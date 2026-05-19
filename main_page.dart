@@ -11,6 +11,8 @@ import './ranking_page.dart';
 import './options_page.dart';
 import './change_password.dart';
 import './candidaturas.dart';
+import 'dart:convert';
+import '../widgets/base64_image_widget.dart';
 
 class MainPage extends StatefulWidget {
   @override
@@ -33,6 +35,75 @@ class _MainPageState extends State<MainPage> {
     _candidaturasFuture = ApiService.getCandidaturas();
     _notificacoesFuture = ApiService.getNotificacoes();
     if (mounted) setState(() {});
+  }
+
+  ImageProvider _getBackgroundImage(String? fotoUrl) {
+    if (fotoUrl == null || fotoUrl.isEmpty) {
+      return AssetImage('assets/placeholder.png');
+    }
+    
+    if (Base64ImageWidget.isBase64(fotoUrl)) {
+      try {
+        final imageBytes = Base64ImageWidget.decodeBase64(fotoUrl);
+        return MemoryImage(imageBytes);
+      } catch (e) {
+        return NetworkImage('');
+      }
+    }
+    
+    return NetworkImage(fotoUrl);
+  }
+
+  CircleAvatar _getDefaultAvatar({double radius = 26}) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.purple.shade100,
+      child: Icon(
+        Icons.person,
+        color: Colors.purple,
+        size: radius * 0.8,
+      ),
+    );
+  }
+
+  Widget _buildBadgeAvatar(dynamic badge) {
+    if (badge == null || badge['imagemurl'] == null) {
+      return CircleAvatar(
+        radius: 22,
+        backgroundColor: Colors.blue.shade100,
+        child: const Icon(
+          Icons.emoji_events,
+          size: 22,
+          color: Colors.blue,
+        ),
+      );
+    }
+
+    final url = badge['imagemurl'].toString();
+    if (Base64ImageWidget.isBase64(url)) {
+      try {
+        final imageBytes = Base64ImageWidget.decodeBase64(url);
+        return CircleAvatar(
+          radius: 22,
+          backgroundColor: Colors.blue.shade100,
+          backgroundImage: MemoryImage(imageBytes),
+          child: null,
+        );
+      } catch (e) {
+        return CircleAvatar(
+          radius: 22,
+          backgroundColor: Colors.red.shade100,
+          child: const Icon(Icons.error, size: 12),
+        );
+      }
+    }
+
+    return CircleAvatar(
+      radius: 22,
+      backgroundColor: Colors.blue.shade100,
+      backgroundImage: NetworkImage(url),
+      child: null,
+    );
   }
 
   @override
@@ -203,21 +274,7 @@ class _MainPageState extends State<MainPage> {
                               .map<Widget>(
                                 (b) => Padding(
                                   padding: const EdgeInsets.only(right: 8),
-                                  child: CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: Colors.blue.shade100,
-                                    backgroundImage:
-                                        b != null && b['imagemurl'] != null
-                                            ? NetworkImage(b['imagemurl'])
-                                            : null,
-                                    child: b == null || b['imagemurl'] == null
-                                        ? const Icon(
-                                            Icons.emoji_events,
-                                            size: 22,
-                                            color: Colors.blue,
-                                          )
-                                        : null,
-                                  ),
+                                  child: _buildBadgeAvatar(b),
                                 ),
                               )
                               .toList(),
@@ -341,29 +398,14 @@ class _MainPageState extends State<MainPage> {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 26,
-                      backgroundColor: Colors.purple.shade100,
-                      child: ClipOval(
-                        child: fotoUrl.isNotEmpty
-                            ? Image.network(
-                                fotoUrl,
-                                width: 52,
-                                height: 52,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.person,
-                                  color: Colors.purple,
-                                  size: 30,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.person,
-                                color: Colors.purple,
-                                size: 30,
-                              ),
-                      ),
-                    ),
+                    fotoUrl.isNotEmpty
+                        ? CircleAvatar(
+                            radius: 26,
+                            backgroundColor: Colors.purple.shade100,
+                            backgroundImage: _getBackgroundImage(fotoUrl),
+                            child: null,
+                          )
+                        : _getDefaultAvatar(radius: 26),
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -534,12 +576,12 @@ class _MainPageState extends State<MainPage> {
         children: [
           badge == null || badge['imagemurl'] == null
               ? const Icon(Icons.emoji_events, size: 50, color: Colors.grey)
-              : Image.network(
-                  badge['imagemurl'],
+              : Base64ImageWidget(
+                  imageData: badge['imagemurl'],
                   width: 50,
                   height: 50,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
+                  errorWidget: const Icon(
                     Icons.emoji_events,
                     size: 50,
                     color: Colors.grey,

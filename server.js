@@ -113,14 +113,220 @@ async function calcularProgressoBadge(client, userId, badgeId, idCandidatura) {
 }
 
 // ─────────────────────────────────────────────────────────
-// BADGES
+// ÁREAS
 // ─────────────────────────────────────────────────────────
+
+app.get("/areas", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT idarea, nome, descricao FROM areas WHERE ativo = TRUE ORDER BY nome ASC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao buscar áreas:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/debug/areas", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM areas");
+    res.json({ 
+      total: result.rows.length,
+      areas: result.rows 
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/niveis", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT idnivel, nome, descricao FROM nivel ORDER BY idnivel ASC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao carregar níveis:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// SERVICELINE
+// ─────────────────────────────────────────────────────────
+app.get("/serviceline", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT idserviceline, nome, descricao FROM serviceline WHERE ativo = TRUE ORDER BY nome ASC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao buscar serviceline:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/debug/serviceline", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM serviceline");
+    res.json({ 
+      total: result.rows.length,
+      serviceline: result.rows 
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// ÁREAS
+// ─────────────────────────────────────────────────────────────
+
+app.get("/areas", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT idarea, nome, descricao FROM areas WHERE ativo = TRUE ORDER BY nome ASC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao buscar áreas:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/debug/areas", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM areas");
+    res.json({ 
+      total: result.rows.length,
+      areas: result.rows 
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/niveis", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT idnivel, nome, descricao FROM nivel ORDER BY idnivel ASC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao carregar níveis:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// SERVICELINE
+// ─────────────────────────────────────────────────────────────
+app.get("/serviceline", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT idserviceline, nome, descricao FROM serviceline WHERE ativo = TRUE ORDER BY nome ASC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao buscar serviceline:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/debug/serviceline", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM serviceline");
+    res.json({ 
+      total: result.rows.length,
+      serviceline: result.rows 
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// BADGES
+// ─────────────────────────────────────────────────────────────
 app.get("/badges", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM badges ORDER BY idbadge ASC");
     res.json(result.rows);
   } catch (err) {
     console.error("Erro ao buscar badges:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/badges/recomendados/:userId", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: "ID do utilizador inválido" });
+    }
+
+    // Primeiro obter o idarea do utilizador
+    const userResult = await pool.query(
+      "SELECT idarea FROM utilizadores WHERE idutilizador = $1",
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    const idArea = userResult.rows[0].idarea;
+
+    if (!idArea) {
+      // Se o utilizador não tem área, retorna lista vazia
+      return res.json([]);
+    }
+
+    const result = await pool.query(
+      `
+      SELECT b.*
+      FROM badges b
+      WHERE b.idarea = $1
+      ORDER BY b.idbadge ASC
+      `,
+      [idArea]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao buscar badges recomendados:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/badges/recomendados/:userId", async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: "ID do utilizador inválido" });
+    }
+
+    // Primeiro obter o idarea do utilizador
+    const userResult = await pool.query(
+      "SELECT idarea FROM utilizadores WHERE idutilizador = $1",
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    const idArea = userResult.rows[0].idarea;
+
+    if (!idArea) {
+      // Se o utilizador não tem área, retorna lista vazia
+      return res.json([]);
+    }
+
+    const result = await pool.query(
+      `
+      SELECT b.*
+      FROM badges b
+      WHERE b.idarea = $1
+      ORDER BY b.idbadge ASC
+      `,
+      [idArea]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao buscar badges recomendados:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -193,9 +399,11 @@ app.get("/utilizadores/:id/candidaturas", async (req, res) => {
         b.nome,
         b.descricao,
         b.imagemurl,
+        b.idnivel,
         b.pontos,
         b.linkpublicobase,
-        b.competencias
+        b.competencias,
+        b.certificado
       FROM candidaturasbadge cb
       INNER JOIN badges b ON b.idbadge = cb.badge_id
       WHERE cb.user_id = $1
@@ -205,37 +413,6 @@ app.get("/utilizadores/:id/candidaturas", async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("Erro ao carregar candidaturas:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/candidaturas/:id/requisitos", async (req, res) => {
-  try {
-    const candidaturaId = parseInt(req.params.id, 10);
-
-    if (isNaN(candidaturaId)) {
-      return res.status(400).json({ error: "ID da candidatura inválido" });
-    }
-
-    const result = await pool.query(
-      `
-      SELECT 
-        cr.idcandidaturareq,
-        cr.idrequisito,
-        r.titulo as requisito_titulo,
-        e.ficheirourl as evidencia_url
-      FROM candidaturasrequisitos cr
-      INNER JOIN requisitos r ON r.idrequisito = cr.idrequisito
-      LEFT JOIN evidencias e ON e.idcandidaturareq = cr.idcandidaturareq
-      WHERE cr.idcandidatura = $1
-      ORDER BY r.idrequisito ASC
-      `,
-      [candidaturaId]
-    );
-
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Erro ao carregar requisitos da candidatura:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -362,7 +539,7 @@ app.post("/candidaturas", upload.any(), async (req, res) => {
         `,
         [
           idCandidaturaReq,
-          `http://${req.get('host')}/uploads/candidaturas/${file.filename}`,
+          `http://100.105.58.22:3000/uploads/candidaturas/${file.filename}`,
           file.originalname,
         ]
       );
@@ -410,6 +587,83 @@ app.get("/utilizadores", async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────
+// GET: RANKING (ANTES de :id para evitar conflito)
+// ─────────────────────────────────────────────────────────
+app.get("/utilizadores/ranking", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        idutilizador,
+        nome,
+        email,
+        COALESCE(fotourl, '') as fotourl,
+        COALESCE(pontos, 0)::int as pontos
+      FROM utilizadores
+      WHERE nome IS NOT NULL
+      ORDER BY COALESCE(pontos, 0) DESC, nome ASC
+    `);
+    
+    if (result.rows.length === 0) {
+      return res.json([]);
+    }
+    
+    const rankingValido = result.rows.map(row => ({
+      idutilizador: row.idutilizador,
+      nome: row.nome || "Sem nome",
+      email: row.email || "",
+      fotourl: row.fotourl || "",
+      pontos: parseInt(row.pontos) || 0
+    }));
+    
+    res.json(rankingValido);
+  } catch (err) {
+    res.status(500).json({ 
+      error: "Erro ao carregar ranking",
+      details: err.message 
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// GET: UTILIZADOR ESPECÍFICO (por ID) - Inclui todos os dados
+// ─────────────────────────────────────────────────────────
+app.get("/utilizadores/:id", async (req, res) => {
+  try {
+    const idutilizador = parseInt(req.params.id, 10);
+
+    if (isNaN(idutilizador)) {
+      return res.status(400).json({ error: "ID do utilizador inválido" });
+    }
+
+    const result = await pool.query(
+      `SELECT 
+        u.idutilizador,
+        u.nome,
+        u.email,
+        u.fotourl,
+        u.pontos,
+        u.idarea,
+        u.idrole,
+        u.estadoconta,
+        u.datacriacao,
+        a.nome as area_nome
+      FROM utilizadores u
+      LEFT JOIN areas a ON u.idarea = a.idarea
+      WHERE u.idutilizador = $1`,
+      [idutilizador]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Erro ao buscar utilizador:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.get("/utilizadores/:id/badges", async (req, res) => {
   try {
     const idUtilizador = parseInt(req.params.id, 10);
@@ -429,6 +683,7 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
         COALESCE(ub.created_at, NOW()) as created_at,
         COALESCE(ub.updated_at, NOW()) as updated_at,
         cb.estado,
+        cb.datasubmissao,
         CASE
           WHEN COALESCE(ub.progresso_atual, 0) >= COALESCE(ub.progresso_total, requisitos_count.total) 
           AND requisitos_count.total > 0
@@ -436,7 +691,7 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
           ELSE CONCAT(COALESCE(ub.progresso_atual, 0), '/', COALESCE(ub.progresso_total, requisitos_count.total))
         END AS estado_visual
       FROM badges b
-      INNER JOIN candidaturasbadge cb ON cb.badge_id = b.idbadge AND cb.user_id = $1 AND cb.estado = 'APPROVED'
+      LEFT JOIN candidaturasbadge cb ON cb.badge_id = b.idbadge AND cb.user_id = $1
       LEFT JOIN utilizador_badge ub ON ub.user_id = $1 AND ub.badge_id = b.idbadge
       LEFT JOIN LATERAL (
         SELECT COUNT(*)::int as total
@@ -475,16 +730,68 @@ app.patch("/utilizadores/:id/foto", upload.single("foto"), async (req, res) => {
   }
 });
 
-app.get("/utilizadores/ranking", async (req, res) => {
+// ─────────────────────────────────────────────────────────
+// NOVO: Atualizar foto com BASE64 (direto na BD, sem ficheiros)
+// ─────────────────────────────────────────────────────────
+app.patch("/utilizadores/:id/foto-base64", async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT idutilizador, nome, email, fotourl, pontos
-      FROM utilizadores
-      ORDER BY pontos DESC, nome ASC
-    `);
+    const { foto_base64 } = req.body;
+    
+    if (!foto_base64) {
+      return res.status(400).json({ error: "Foto base64 não fornecida" });
+    }
+
+    // Validar se é realmente base64
+    if (!/^[A-Za-z0-9+/=]+$/.test(foto_base64)) {
+      return res.status(400).json({ error: "Base64 inválido" });
+    }
+
+    // Armazenar base64 direto na coluna 'fotourl'
+    await pool.query(
+      "UPDATE utilizadores SET fotourl = $1 WHERE idutilizador = $2",
+      [foto_base64, req.params.id]
+    );
+
+    res.json({ 
+      success: true, 
+      foto_base64: foto_base64 
+    });
+  } catch (err) {
+    console.error("Erro ao atualizar foto base64:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DIAGNÓSTICO: Testar conexão à BD
+app.get("/debug/ping", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT 1 as teste");
+    res.json({ status: "OK", message: "Conexão à BD funcionando" });
+  } catch (err) {
+    res.status(500).json({ 
+      status: "ERRO", 
+      message: err.message 
+    });
+  }
+});
+
+// DIAGNÓSTICO: Ver quantos utilizadores existem
+app.get("/debug/utilizadores-count", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT COUNT(*) as total FROM utilizadores");
+    res.json({ total: result.rows[0].total });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DIAGNÓSTICO: Ver todos os IDs
+app.get("/debug/utilizadores-ids", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT idutilizador, nome, pontos FROM utilizadores ORDER BY pontos DESC");
+    console.log(`Utilizadores carregados: ${result.rows.length} registos`);
     res.json(result.rows);
   } catch (err) {
-    console.error("Erro ao carregar ranking:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -561,7 +868,7 @@ app.post("/login", async (req, res) => {
 });
 
 app.post("/registro", async (req, res) => {
-  const { nome, email, password } = req.body;
+  const { nome, email, password, idarea } = req.body;
 
   if (!nome || !email || !password) {
     return res
@@ -583,10 +890,10 @@ app.post("/registro", async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO utilizadores
-        (nome, email, passwordhash, idrole, emailconfirmado, primeirologin, estadoconta, datacriacao, pontos)
-       VALUES ($1, $2, $3, 1, FALSE, TRUE, 'ATIVA', NOW(), 0)
-       RETURNING idutilizador, nome, email, fotourl, pontos, datacriacao`,
-      [nome, email, hash]
+        (nome, email, passwordhash, idrole, idarea, emailconfirmado, primeirologin, estadoconta, datacriacao, pontos)
+       VALUES ($1, $2, $3, 1, $4, FALSE, TRUE, 'ATIVA', NOW(), 0)
+       RETURNING idutilizador, nome, email, fotourl, idarea, pontos, datacriacao`,
+      [nome, email, hash, idarea || null]
     );
 
     res.status(201).json({ success: true, utilizador: result.rows[0] });

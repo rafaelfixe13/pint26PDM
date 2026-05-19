@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../services/session.dart';
 import '../../../services/api_service.dart';
+import '../../../widgets/base64_image_widget.dart';
 import './edit_photo_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -66,6 +67,38 @@ class _ProfilePageState extends State<ProfilePage> {
     return texto;
   }
 
+  ImageProvider _getBackgroundImage(String fotoUrl) {
+    if (fotoUrl.isEmpty) {
+      return AssetImage('assets/placeholder.png'); // ou NetworkImage vazio
+    }
+
+    // Se é base64
+    if (Base64ImageWidget.isBase64(fotoUrl)) {
+      try {
+        final imageBytes = Base64ImageWidget.decodeBase64(fotoUrl);
+        return MemoryImage(imageBytes);
+      } catch (e) {
+        debugPrint('Erro ao decodificar base64: $e');
+        return NetworkImage(''); // Fallback para evitar crash
+      }
+    }
+
+    // Se é URL
+    return NetworkImage(fotoUrl);
+  }
+
+  CircleAvatar _getDefaultAvatar({double radius = 50}) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.purple.shade100,
+      child: Icon(
+        Icons.person,
+        color: Colors.purple,
+        size: radius * 0.8,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Session.utilizador;
@@ -96,36 +129,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     Stack(
                       children: [
-                        CircleAvatar(
-                          key: _avatarKey,
-                          radius: 50,
-                          backgroundColor: Colors.purple.shade100,
-                          child: ClipOval(
-                            child: fotoUrl.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: fotoUrl,
-                                    width: 100,
-                                    height: 100,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Center(
-                                      child: CircularProgressIndicator(
-                                        color: Colors.purple,
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                    errorWidget: (context, url, error) => Icon(
-                                      Icons.person,
-                                      size: 50,
-                                      color: Colors.purple,
-                                    ),
-                                  )
-                                : Icon(
-                                    Icons.person,
-                                    size: 50,
-                                    color: Colors.purple,
-                                  ),
-                          ),
-                        ),
+                        fotoUrl.isNotEmpty
+                            ? CircleAvatar(
+                                key: _avatarKey,
+                                radius: 50,
+                                backgroundColor: Colors.purple.shade100,
+                                backgroundImage: _getBackgroundImage(fotoUrl),
+                                child: null,
+                              )
+                            : _getDefaultAvatar(radius: 50),
                         Positioned(
                           bottom: 2,
                           right: 2,
@@ -302,8 +314,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(14),
                             child: imagem.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: imagem
+                                ? Base64ImageWidget(
+                                    imageData: imagem
                                         .replaceAll('localhost', '10.0.2.2')
                                         .replaceAll('127.0.0.1', '10.0.2.2')
                                         .replaceAll('100.105.58.22', '10.0.2.2')
@@ -311,7 +323,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     width: 78,
                                     height: 78,
                                     fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(
+                                    placeholder: Container(
                                       width: 78,
                                       height: 78,
                                       color: Colors.grey.shade200,
@@ -322,8 +334,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         ),
                                       ),
                                     ),
-                                    errorWidget: (context, url, error) =>
-                                        Container(
+                                    errorWidget: Container(
                                       width: 78,
                                       height: 78,
                                       color: Colors.blue.shade50,

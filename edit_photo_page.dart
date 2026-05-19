@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
+import '../widgets/base64_image_widget.dart';
 
 class EditPhotoPage extends StatefulWidget {
   @override
@@ -34,6 +36,38 @@ class _EditPhotoPageState extends State<EditPhotoPage> {
     }
   }
 
+  ImageProvider _getBackgroundImage(String fotoUrl) {
+    if (fotoUrl.isEmpty) {
+      return NetworkImage('');
+    }
+
+    // Se é base64
+    if (Base64ImageWidget.isBase64(fotoUrl)) {
+      try {
+        final imageBytes = Base64ImageWidget.decodeBase64(fotoUrl);
+        return MemoryImage(imageBytes);
+      } catch (e) {
+        debugPrint('Erro ao decodificar base64: $e');
+        return NetworkImage('');
+      }
+    }
+
+    // Se é URL
+    return NetworkImage(fotoUrl);
+  }
+
+  CircleAvatar _getDefaultAvatar({double radius = 70}) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.purple.shade100,
+      child: Icon(
+        Icons.person,
+        color: Colors.purple,
+        size: radius * 0.8,
+      ),
+    );
+  }
+
   Future<void> _guardar() async {
     if (_imagemSelecionada == null) {
       setState(() => _erro = 'Seleciona uma imagem primeiro');
@@ -46,18 +80,20 @@ class _EditPhotoPageState extends State<EditPhotoPage> {
     });
 
     try {
-      // ← só limpa cache se já tiver foto
-      if (Session.fotoUrl.isNotEmpty) {
-        await CachedNetworkImage.evictFromCache(Session.fotoUrl);
-      }
+      // Converter imagem para base64
+      final imageBytes = await _imagemSelecionada!.readAsBytes();
+      final base64Image = base64Encode(imageBytes);
 
-      final novaUrl = await ApiService.atualizarFoto(
+      // Enviar base64 para API
+      final fotoBase64 = await ApiService.atualizarFotoBase64(
         Session.id,
-        _imagemSelecionada!.path,
+        base64Image,
       );
 
-      Session.utilizador['fotourl'] = novaUrl;
+      // Atualizar sessão com nova foto em base64
+      Session.utilizador['fotourl'] = fotoBase64;
 
+      // Limpar cache local
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
 
@@ -107,38 +143,21 @@ class _EditPhotoPageState extends State<EditPhotoPage> {
             Center(
               child: Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 70,
-                    backgroundColor: Colors.purple.shade100,
-                    child: ClipOval(
-                      child: _imagemSelecionada != null
-                          ? Image.file(
-                              _imagemSelecionada!,
-                              width: 140,
-                              height: 140,
-                              fit: BoxFit.cover,
+                  _imagemSelecionada != null
+                      ? CircleAvatar(
+                          radius: 70,
+                          backgroundColor: Colors.purple.shade100,
+                          backgroundImage: FileImage(_imagemSelecionada!),
+                          child: null,
+                        )
+                      : Session.fotoUrl.isNotEmpty
+                          ? CircleAvatar(
+                              radius: 70,
+                              backgroundColor: Colors.purple.shade100,
+                              backgroundImage: _getBackgroundImage(Session.fotoUrl),
+                              child: null,
                             )
-                          : Session.fotoUrl.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: Session.fotoUrl,
-                                  width: 140,
-                                  height: 140,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => Center(
-                                    child: CircularProgressIndicator(
-                                      color: Colors.purple,
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                  errorWidget: (context, url, error) =>
-                                      Icon(Icons.person,
-                                          size: 70,
-                                          color: Colors.purple),
-                                )
-                              : Icon(Icons.person,
-                                  size: 70, color: Colors.purple),
-                    ),
-                  ),
+                          : _getDefaultAvatar(radius: 70),
                   Positioned(
                     bottom: 4,
                     right: 4,

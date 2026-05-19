@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'badge_detail_page.dart';
+import '../widgets/base64_image_widget.dart';
 
 class BadgesPage extends StatefulWidget {
   @override
@@ -337,12 +338,12 @@ class _BadgeCard extends StatelessWidget {
         children: [
           badge['imagemurl'] != null &&
                   badge['imagemurl'].toString().isNotEmpty
-              ? Image.network(
-                  badge['imagemurl'],
+              ? Base64ImageWidget(
+                  imageData: badge['imagemurl'],
                   width: 80,
                   height: 80,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Icon(Icons.emoji_events,
+                  errorWidget: Icon(Icons.emoji_events,
                       size: 80, color: Color(0xFF2563EB)),
                 )
               : Icon(Icons.emoji_events, size: 80, color: Color(0xFF2563EB)),

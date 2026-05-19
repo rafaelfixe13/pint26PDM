@@ -3,6 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/api_service.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
+import '../widgets/base64_image_widget.dart';
 
 class BadgeDetailPage extends StatefulWidget {
   final dynamic badge;
@@ -26,6 +32,9 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
     final int atual = int.tryParse(badge['progresso_atual']?.toString() ?? '0') ?? 0;
     final int total = int.tryParse(badge['progresso_total']?.toString() ?? '0') ?? 0;
 
+    final candidatura = widget.candidatura;
+    final isApproved = candidatura != null && candidatura['estado'] == 'APPROVED';
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -35,6 +44,14 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
           icon: Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          if (isApproved)
+            IconButton(
+              icon: Icon(Icons.share, color: Colors.black),
+              onPressed: _gerarECompartilharPdf,
+              tooltip: 'Partilhar Certificado',
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -46,10 +63,13 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
 
                   // Imagem grande
                   badge['imagemurl'] != null
-                      ? Image.network(badge['imagemurl'], width: 160, height: 160,
+                      ? Base64ImageWidget(
+                          imageData: badge['imagemurl'],
+                          width: 160,
+                          height: 160,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) =>
-                              Icon(Icons.emoji_events, size: 160, color: Color(0xFF2563EB)))
+                          errorWidget: Icon(Icons.emoji_events, size: 160, color: Color(0xFF2563EB)),
+                        )
                       : Icon(Icons.emoji_events, size: 160, color: Color(0xFF2563EB)),
 
                   SizedBox(height: 16),
@@ -294,23 +314,44 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
           ),
         ),
         SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: () => _mostrarDialogCandidatura(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFFFF9800),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+        // Se estado é APPROVED, mostra botão verde de guardar certificado
+        if (candidatura['estado'] == 'APPROVED')
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: _guardarCertificado,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF10B981), // Verde
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: Icon(Icons.download, color: Colors.white),
+              label: Text(
+                'Guardar Certificado',
+                style: TextStyle(fontSize: 16, color: Colors.white),
               ),
             ),
-            child: Text(
-              'Atualizar Candidatura',
-              style: TextStyle(fontSize: 16, color: Colors.white),
+          )
+        else
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: () => _mostrarDialogCandidatura(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFFFF9800),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                'Atualizar Candidatura',
+                style: TextStyle(fontSize: 16, color: Colors.white),
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -575,6 +616,142 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _gerarECompartilharPdf() async {
+    try {
+      final badge = widget.badge;
+      
+      // Se existe URL de certificado no badge, partilhar
+      if (badge?['certificado'] != null && badge['certificado'].isNotEmpty) {
+        final url = badge['certificado'];
+        
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => Center(child: CircularProgressIndicator()),
+        );
+
+        // Download do PDF
+        final response = await http.get(Uri.parse(url));
+        
+        if (mounted) Navigator.pop(context);
+        
+        if (response.statusCode == 200) {
+          final outputDir = await getTemporaryDirectory();
+          final file = File('${outputDir.path}/${badge['nome'] ?? 'badge'}.pdf');
+          await file.writeAsBytes(response.bodyBytes);
+
+          // Usar Share nativa do Flutter
+          try {
+            await Share.shareXFiles(
+              [XFile(file.path, mimeType: 'application/pdf')],
+              text: 'Conquistei o badge "${badge['nome']}"! 🎉',
+            );
+          } catch (e) {
+            // Se Share falhar, mostra opção de copiar link
+            Clipboard.setData(ClipboardData(text: url));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Link copiado! Cola em qualquer app para partilhar.'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao descarregar certificado')),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Certificado não disponível')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _guardarCertificado() async {
+    try {
+      final badge = widget.badge;
+      
+      // Se existe URL de certificado no badge, fazer download
+      if (badge?['certificado'] != null && badge['certificado'].isNotEmpty) {
+        final url = badge['certificado'];
+        
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        // Download do PDF
+        final response = await http.get(Uri.parse(url));
+        
+        if (mounted) Navigator.pop(context);
+        
+        if (response.statusCode == 200) {
+          // Guardar diretamente na pasta Download do dispositivo
+          Directory downloadDir;
+          
+          try {
+            // Caminho direto para Download
+            downloadDir = Directory('/storage/emulated/0/Download');
+            
+            // Se não existir, criar
+            if (!await downloadDir.exists()) {
+              await downloadDir.create(recursive: true);
+            }
+          } catch (e) {
+            // Fallback: usar documentos da app
+            print('Erro ao aceder a Download: $e');
+            downloadDir = await getApplicationDocumentsDirectory();
+          }
+
+          final fileName = '${badge['nome'] ?? 'Certificado_Badge'}.pdf';
+          final filePath = '${downloadDir.path}/$fileName';
+          final file = File(filePath);
+          
+          try {
+            await file.writeAsBytes(response.bodyBytes);
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('✅ Certificado guardado em Downloads! 📥'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          } catch (e) {
+            print('Erro ao guardar ficheiro: $e');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Erro ao guardar: $e')),
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao descarregar certificado')),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Certificado não disponível')),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao guardar: $e')),
+      );
+    }
   }
 }
 

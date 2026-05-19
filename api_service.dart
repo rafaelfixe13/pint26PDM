@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../services/session.dart';
 
@@ -203,6 +204,34 @@ class ApiService {
     }
 
     throw Exception('Erro ao atualizar foto');
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // NOVO: Atualizar foto usando BASE64 (em vez de multipart)
+  // ─────────────────────────────────────────────────────────
+  static Future<String> atualizarFotoBase64(
+    int idUtilizador,
+    String fotoBase64,
+  ) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/utilizadores/$idUtilizador/foto-base64'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'foto_base64': fotoBase64,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = _decodeJsonSafely(response) as Map<String, dynamic>;
+      return data['foto_base64'] ?? '';
+    }
+
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao atualizar foto'),
+    );
   }
 
   static Future<Map<String, dynamic>> login(

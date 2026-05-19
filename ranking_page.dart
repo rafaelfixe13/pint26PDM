@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
+import '../widgets/base64_image_widget.dart';
 
 class RankingPage extends StatefulWidget {
   @override
@@ -46,7 +47,42 @@ class _RankingPageState extends State<RankingPage> {
             return Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
-            return Center(child: Text('Erro ao carregar ranking'));
+            return Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    SizedBox(height: 16),
+                    Text(
+                      'Erro ao carregar ranking',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '${snap.error}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _rankingFuture = ApiService.getRanking();
+                        });
+                      },
+                      icon: Icon(Icons.refresh),
+                      label: Text('Tentar Novamente'),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           final lista = snap.data ?? [];
@@ -242,9 +278,6 @@ class _TopCard extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        if (showCrown)
-          Text('👑', style: TextStyle(fontSize: 28)),
-
         Stack(
           alignment: Alignment.center,
           children: [
@@ -330,21 +363,38 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = fotoUrl?.toString() ?? '';
 
+    if (url.isEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.purple.shade100,
+        child: Icon(Icons.person, size: radius, color: Colors.purple),
+      );
+    }
+
+    if (Base64ImageWidget.isBase64(url)) {
+      try {
+        final imageBytes = Base64ImageWidget.decodeBase64(url);
+        return CircleAvatar(
+          radius: radius,
+          backgroundColor: Colors.purple.shade100,
+          backgroundImage: MemoryImage(imageBytes),
+          child: null,
+        );
+      } catch (e) {
+        return CircleAvatar(
+          radius: radius,
+          backgroundColor: Colors.red.shade100,
+          child: Icon(Icons.error, size: radius * 0.6),
+        );
+      }
+    }
+
     return CircleAvatar(
       radius: radius,
       backgroundColor: Colors.purple.shade100,
-      child: ClipOval(
-        child: url.isNotEmpty
-            ? CachedNetworkImage(
-                imageUrl: url,
-                width: radius * 2,
-                height: radius * 2,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) =>
-                    Icon(Icons.person, size: radius, color: Colors.purple),
-              )
-            : Icon(Icons.person, size: radius, color: Colors.purple),
-      ),
+      backgroundImage: NetworkImage(url),
+      onBackgroundImageError: (exception, stackTrace) {},
+      child: null,
     );
   }
 }
