@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:convert';
 import '../services/api_service.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
-import 'package:http/http.dart' as http;
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/base64_image_widget.dart';
 
 class BadgeDetailPage extends StatefulWidget {
@@ -48,8 +47,14 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
           if (isApproved)
             IconButton(
               icon: Icon(Icons.share, color: Colors.black),
-              onPressed: _gerarECompartilharPdf,
-              tooltip: 'Partilhar Certificado',
+              onPressed: _compartilharLinkedIn,
+              tooltip: 'Partilhar no LinkedIn',
+            ),
+          if (isApproved)
+            IconButton(
+              icon: Icon(Icons.business, color: Colors.black),
+              onPressed: _linkedin,
+              tooltip: 'Abrir LinkedIn',
             ),
         ],
       ),
@@ -459,18 +464,6 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
     );
   }
 
-  Widget _icon(IconData icon, Color color, {bool selected = false}) {
-    return Container(
-      width: 52, height: 52,
-      decoration: BoxDecoration(
-        color: selected ? Color(0xFFEFF6FF) : color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: selected ? Border.all(color: Color(0xFF2563EB), width: 2) : null,
-      ),
-      child: Icon(icon, size: 26, color: selected ? Color(0xFF2563EB) : color),
-    );
-  }
-
   Future<void> _mostrarImagemDialog(BuildContext context, String urlFicheiro, String titulo) async {
     showDialog(
       context: context,
@@ -618,74 +611,25 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
     );
   }
 
-  Future<void> _gerarECompartilharPdf() async {
-    try {
-      final badge = widget.badge;
-      
-      // Se existe URL de certificado no badge, partilhar
-      if (badge?['certificado'] != null && badge['certificado'].isNotEmpty) {
-        final url = badge['certificado'];
-        
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => Center(child: CircularProgressIndicator()),
-        );
-
-        // Download do PDF
-        final response = await http.get(Uri.parse(url));
-        
-        if (mounted) Navigator.pop(context);
-        
-        if (response.statusCode == 200) {
-          final outputDir = await getTemporaryDirectory();
-          final file = File('${outputDir.path}/${badge['nome'] ?? 'badge'}.pdf');
-          await file.writeAsBytes(response.bodyBytes);
-
-          // Usar Share nativa do Flutter
-          try {
-            await Share.shareXFiles(
-              [XFile(file.path, mimeType: 'application/pdf')],
-              text: 'Conquistei o badge "${badge['nome']}"! 🎉',
-            );
-          } catch (e) {
-            // Se Share falhar, mostra opção de copiar link
-            Clipboard.setData(ClipboardData(text: url));
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Link copiado! Cola em qualquer app para partilhar.'),
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao descarregar certificado')),
-          );
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Certificado não disponível')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
-        );
-      }
-    }
-  }
-
   Future<void> _guardarCertificado() async {
     try {
       final badge = widget.badge;
       
-      // Se existe URL de certificado no badge, fazer download
+      // Se existe certificado em base64 no badge
       if (badge?['certificado'] != null && badge['certificado'].isNotEmpty) {
-        final url = badge['certificado'];
+        final certificadoBase64 = badge['certificado'];
         
+        // Verificar se é realmente base64
+        if (!certificadoBase64.startsWith('JVBERi')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Formato de certificado inválido. Esperado: Base64'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -694,51 +638,53 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
           ),
         );
 
-        // Download do PDF
-        final response = await http.get(Uri.parse(url));
-        
-        if (mounted) Navigator.pop(context);
-        
-        if (response.statusCode == 200) {
-          // Guardar diretamente na pasta Download do dispositivo
-          Directory downloadDir;
+        try {
+          // Descodificar base64 para bytes
+          final pdfBytes = base64Decode(certificadoBase64);
           
-          try {
-            // Caminho direto para Download
-            downloadDir = Directory('/storage/emulated/0/Download');
+          // Determinar pasta de Downloads conforme a plataforma
+          late Directory downloadDir;
+          
+          if (Platform.isAndroid) {
+            // Android: usar getExternalStorageDirectory para pasta Downloads
+            // Esta pasta não requer permissões adicionais quando usada corretamente
+            final externalDir = await getExternalStorageDirectory();
             
-            // Se não existir, criar
+            if (externalDir == null) {
+              throw Exception('Não conseguimos aceder à pasta externa do dispositivo');
+            }
+            
+            // Criar pasta Downloads dentro da app
+            downloadDir = Directory('${externalDir.path}/Downloads');
             if (!await downloadDir.exists()) {
               await downloadDir.create(recursive: true);
             }
-          } catch (e) {
-            // Fallback: usar documentos da app
-            print('Erro ao aceder a Download: $e');
+          } else {
+            // iOS: usar documentos da app
             downloadDir = await getApplicationDocumentsDirectory();
           }
 
-          final fileName = '${badge['nome'] ?? 'Certificado_Badge'}.pdf';
+          final fileName = '${badge['nome'] ?? 'Certificado'}.pdf';
           final filePath = '${downloadDir.path}/$fileName';
           final file = File(filePath);
           
-          try {
-            await file.writeAsBytes(response.bodyBytes);
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('✅ Certificado guardado em Downloads! 📥'),
-                duration: Duration(seconds: 4),
-              ),
-            );
-          } catch (e) {
-            print('Erro ao guardar ficheiro: $e');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Erro ao guardar: $e')),
-            );
-          }
-        } else {
+          await file.writeAsBytes(pdfBytes);
+          
+          if (mounted) Navigator.pop(context);
+          
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao descarregar certificado')),
+            SnackBar(
+              content: Text(' Certificado guardado em Downloads! '),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        } catch (e) {
+          if (mounted) Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao guardar certificado: $e'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       } else {
@@ -749,7 +695,150 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao guardar: $e')),
+        SnackBar(
+          content: Text('Erro ao guardar: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _linkedin() async {
+    try {
+      // Tentar vários schemes do LinkedIn
+      final schemes = [
+        'linkedin://',
+        'linkedin://app',
+        'com.linkedin.android://',
+      ];
+      
+      bool opened = false;
+      
+      for (String scheme in schemes) {
+        try {
+          if (await canLaunchUrl(Uri.parse(scheme))) {
+            await launchUrl(
+              Uri.parse(scheme),
+              mode: LaunchMode.externalApplication,
+            );
+            opened = true;
+            break;
+          }
+        } catch (e) {
+          // Continua para o próximo scheme
+          continue;
+        }
+      }
+      
+      // Se nenhum scheme funcionou, tentar URL web como fallback
+      if (!opened) {
+        try {
+          const linkedinWebUrl = 'https://www.linkedin.com/login?lipi=urn%3Ali%3Apage%3Adeeplink_linkedinmobileapp%3BRYni3FqGSSOWdWB4T0GD%2FA%3D%3D&destType=web&fromSignIn=true&trk=guest_homepage-basic_nav-header-signin';
+          await launchUrl(
+            Uri.parse(linkedinWebUrl),
+            mode: LaunchMode.externalApplication,
+          );
+          opened = true;
+        } catch (e) {
+          // Falhou
+        }
+      }
+      
+      if (!opened) {
+        throw Exception('Não foi possível abrir o LinkedIn');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao abrir LinkedIn: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _compartilharLinkedIn() async {
+    try {
+      final badge = widget.badge;
+      final badgeName = badge['nome'] ?? 'Badge';
+      final badgeDescricao = badge['descricao'] ?? '';
+      
+      // Verificar se existe certificado
+      if (badge?['certificado'] == null || badge['certificado'].isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Certificado não disponível'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Mostrar carregamento
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      try {
+        final certificadoBase64 = badge['certificado'];
+        
+        // Verificar se é realmente Base64
+        if (!certificadoBase64.startsWith('JVBERi')) {
+          if (mounted) Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Formato de certificado inválido'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        // Descodificar Base64 para bytes
+        final pdfBytes = base64Decode(certificadoBase64);
+        
+        // Guardar ficheiro temporário
+        final tempDir = await getTemporaryDirectory();
+        final fileName = '${badgeName.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+        final file = File('${tempDir.path}/$fileName');
+        await file.writeAsBytes(pdfBytes);
+
+        // Texto de partilha
+        final shareText = '🎉 Conquistei o badge "$badgeName" em Softinsa Talent Management!\n\n📝 $badgeDescricao\n\n💪 Estou a desenvolver as minhas competências através de um sistema de gamificação inovador!\n\n#SoftinsaTalent #BadgeSystem #Desenvolvimento #Competências';
+
+        if (mounted) Navigator.pop(context);
+
+        // Partilhar usando Share Plus (abre opções de partilha incluindo LinkedIn)
+        await Share.shareXFiles(
+          [XFile(file.path, mimeType: 'application/pdf')],
+          text: shareText,
+          subject: 'Badge: $badgeName',
+        );
+
+      } catch (e) {
+        if (mounted) Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao processar certificado: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
