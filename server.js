@@ -210,6 +210,19 @@ app.get("/niveis", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// ESPECIAIS
+// ─────────────────────────────────────────────────────────────
+app.get("/especiais", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT idespecial, nome, descricao FROM especial WHERE ativo = TRUE ORDER BY nome ASC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Erro ao buscar especiais:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
 // SERVICELINE
 // ─────────────────────────────────────────────────────────────
 app.get("/serviceline", async (req, res) => {

@@ -12,12 +12,14 @@ class _BadgesPageState extends State<BadgesPage> {
   late Future<List<dynamic>> _badgesFuture;
   late Future<List<dynamic>> _areasFuture;
   late Future<List<dynamic>> _nivelsFuture;
+  late Future<List<dynamic>> _especiaisFuture;
 
   List<dynamic> _todos = [];       // lista completa da API
   List<dynamic> _visiveis = [];    // lista filtrada + lazy
   List<dynamic> _filtrados = [];   // lista após pesquisa
   List<dynamic> _areas = [];       // lista de áreas
   List<dynamic> _niveis = [];      // lista de níveis
+  List<dynamic> _especiais = [];   // lista de especiais
 
   final int _porPagina = 6;        // quantos carregar de cada vez
   int _carregados = 0;
@@ -26,6 +28,7 @@ class _BadgesPageState extends State<BadgesPage> {
   // Filtros
   String? _selectedArea;
   int? _selectedNivel;
+  int? _selectedEspecial;
 
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -62,6 +65,7 @@ class _BadgesPageState extends State<BadgesPage> {
       _badgesFuture = ApiService.getBadgesDoUtilizador();
       _areasFuture = ApiService.getAreas();
       _nivelsFuture = ApiService.getNiveis();
+      _especiaisFuture = ApiService.getEspeciais();
     });
     _badgesFuture.then((lista) {
       setState(() {
@@ -79,9 +83,14 @@ class _BadgesPageState extends State<BadgesPage> {
         _niveis = lista;
       });
     });
+    _especiaisFuture.then((lista) {
+      setState(() {
+        _especiais = lista;
+      });
+    });
   }
 
-  // filtra por nome, nível e área e reinicia o lazy loading
+  // filtra por nome, nível, área e especial e reinicia o lazy loading
   void _filtrar(String query) {
     setState(() {
       _filtrados = _todos.where((b) {
@@ -103,7 +112,12 @@ class _BadgesPageState extends State<BadgesPage> {
             ? true
             : (b['idarea']?.toString() ?? '') == _selectedArea;
 
-        return nomeMatch && nivelMatch && areaMatch;
+        // Filtro por especial
+        final especialMatch = _selectedEspecial == null
+            ? true
+            : (b['idespecial'] ?? -1) == _selectedEspecial;
+
+        return nomeMatch && nivelMatch && areaMatch && especialMatch;
       }).toList();
 
       _carregados = 0;
@@ -211,6 +225,37 @@ class _BadgesPageState extends State<BadgesPage> {
                     ],
                     onChanged: (value) {
                       setState(() => _selectedArea = value);
+                      _filtrar(_searchController.text);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Filtro de Especial
+          Padding(
+            padding: EdgeInsets.only(left: 12, right: 12, bottom: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<int?>(
+                    value: _selectedEspecial,
+                    decoration: InputDecoration(
+                      labelText: 'Especial',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: [
+                      DropdownMenuItem<int?>(value: null, child: Text('Todos')),
+                      ..._especiais.map((especial) => DropdownMenuItem<int?>(
+                        value: especial['idespecial'],
+                        child: Text(especial['nome'] ?? 'Especial ${especial['idespecial']}'),
+                      )),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedEspecial = value);
                       _filtrar(_searchController.text);
                     },
                   ),

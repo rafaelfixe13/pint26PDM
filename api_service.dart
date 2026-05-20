@@ -289,6 +289,21 @@ class ApiService {
     );
   }
 
+  static Future<List<dynamic>> getEspeciais() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/especiais'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as List;
+    }
+
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao carregar especiais'),
+    );
+  }
+
   static Future<Map<String, dynamic>> registro(
     String nome,
     String email,
