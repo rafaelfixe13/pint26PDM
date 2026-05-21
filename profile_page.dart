@@ -102,7 +102,12 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final user = Session.utilizador;
-    final fotoUrl = Session.fotoUrl.trim();
+    final fotoUrl = Session.fotoUrl
+        .trim()
+        .replaceAll('localhost', '10.0.2.2')
+        .replaceAll('127.0.0.1', '10.0.2.2')
+        .replaceAll('100.105.58.22', '10.0.2.2')
+        .replaceAll('0.0.0.0', '10.0.2.2');
     final totalBadges = _badgesConquistados.length;
     final pontos = Session.pontos;
 
@@ -284,7 +289,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   separatorBuilder: (_, __) => SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final badge = _badgesConquistados[index];
-                    final imagem = badge['imagem']?.toString() ?? '';
+                    final imagem = (badge['imagem']?.toString() ?? badge['imagemurl']?.toString() ?? '')
+                        .replaceAll('localhost', '10.0.2.2')
+                        .replaceAll('127.0.0.1', '10.0.2.2')
+                        .replaceAll('100.105.58.22', '10.0.2.2')
+                        .replaceAll('0.0.0.0', '10.0.2.2');
                     final nome = badge['nome']?.toString() ?? 'Badge';
                     final descricao =
                         badge['descricao']?.toString() ?? 'Sem descrição';

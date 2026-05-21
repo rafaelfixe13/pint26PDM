@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import './badge_detail_page.dart';
+import '../widgets/base64_image_widget.dart';
 
 class CandidaturasPage extends StatefulWidget {
   const CandidaturasPage({super.key});
@@ -97,17 +98,22 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
   }
 
   Widget _buildImagemBadge(dynamic candidatura) {
-    final imagemUrl = candidatura['imagemurl']?.toString();
+    final imagemUrl = candidatura['imagemurl']?.toString()
+        .replaceAll('localhost', '10.0.2.2')
+        .replaceAll('127.0.0.1', '10.0.2.2')
+        .replaceAll('100.105.58.22', '10.0.2.2')
+        .replaceAll('0.0.0.0', '10.0.2.2');
 
     if (imagemUrl != null && imagemUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          imagemUrl,
+        child: Base64ImageWidget(
+          imageData: imagemUrl,
           width: 56,
           height: 56,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          borderRadius: BorderRadius.circular(11),
+          errorWidget: Container(
             width: 56,
             height: 56,
             decoration: BoxDecoration(

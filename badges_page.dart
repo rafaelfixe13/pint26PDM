@@ -395,7 +395,12 @@ class _BadgeCard extends StatelessWidget {
           badge['imagemurl'] != null &&
                   badge['imagemurl'].toString().isNotEmpty
               ? Base64ImageWidget(
-                  imageData: badge['imagemurl'],
+                  imageData: badge['imagemurl']
+                      .toString()
+                      .replaceAll('localhost', '10.0.2.2')
+                      .replaceAll('127.0.0.1', '10.0.2.2')
+                      .replaceAll('100.105.58.22', '10.0.2.2')
+                      .replaceAll('0.0.0.0', '10.0.2.2'),
                   width: 80,
                   height: 80,
                   fit: BoxFit.contain,

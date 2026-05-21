@@ -69,7 +69,12 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
                   // Imagem grande
                   badge['imagemurl'] != null
                       ? Base64ImageWidget(
-                          imageData: badge['imagemurl'],
+                          imageData: badge['imagemurl']
+                              .toString()
+                              .replaceAll('localhost', '10.0.2.2')
+                              .replaceAll('127.0.0.1', '10.0.2.2')
+                              .replaceAll('100.105.58.22', '10.0.2.2')
+                              .replaceAll('0.0.0.0', '10.0.2.2'),
                           width: 160,
                           height: 160,
                           fit: BoxFit.contain,
@@ -176,7 +181,11 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
                         spacing: 8,
                         runSpacing: 8,
                         children: requisitos.map((req) {
-                          final imageUrl = req['imagemurl'] as String?;
+                          final imageUrl = (req['imagemurl'] as String?)
+                              ?.replaceAll('localhost', '10.0.2.2')
+                              .replaceAll('127.0.0.1', '10.0.2.2')
+                              .replaceAll('100.105.58.22', '10.0.2.2')
+                              .replaceAll('0.0.0.0', '10.0.2.2');
                           final codigo = req['codigo'] as String? ?? 'REQ';
                           final nome = req['nome'] as String? ?? 'Requisito';
 
