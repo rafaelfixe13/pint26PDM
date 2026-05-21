@@ -5,8 +5,9 @@ import 'dart:io';
 import 'dart:convert';
 import '../services/api_service.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
 import '../widgets/base64_image_widget.dart';
 
 class BadgeDetailPage extends StatefulWidget {
@@ -46,16 +47,15 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
         actions: [
           if (isApproved)
             IconButton(
-              icon: Icon(Icons.share, color: Colors.black),
-              onPressed: _compartilharLinkedIn,
+              icon: Icon(Icons.business, color: Color(0xFF0A66C2)),
+              onPressed: _abrirLinkedIn,
               tooltip: 'Partilhar no LinkedIn',
             ),
-          if (isApproved)
-            IconButton(
-              icon: Icon(Icons.business, color: Colors.black),
-              onPressed: _linkedin,
-              tooltip: 'Abrir LinkedIn',
-            ),
+          IconButton(
+            icon: Icon(Icons.share, color: Colors.black),
+            onPressed: _compartilharPDF,
+            tooltip: 'Partilhar Certificado',
+          ),
         ],
       ),
       body: Column(
@@ -851,7 +851,99 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
       );
     }
   }
+
+  Future<void> _abrirLinkedIn() async {
+    try {
+      // Try platform-specific LinkedIn deep links
+      final linkedinSchemes = [
+        // Android LinkedIn app
+        'com.linkedin.android://home',
+        // iOS LinkedIn app
+        'linkedin://app',
+        // Web fallback
+        'https://www.linkedin.com',
+      ];
+
+      bool opened = false;
+
+      for (String scheme in linkedinSchemes) {
+        try {
+          final uri = Uri.parse(scheme);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(
+              uri,
+              mode: LaunchMode.externalApplication,
+            );
+            opened = true;
+            break;
+          }
+        } catch (e) {
+          debugPrint('LinkedIn scheme failed: $scheme');
+          continue;
+        }
+      }
+
+      if (!opened) {
+        // Last resort - try web
+        await launchUrl(
+          Uri.parse('https://www.linkedin.com'),
+          mode: LaunchMode.externalApplication,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao abrir LinkedIn: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _compartilharPDF() async {
+    try {
+      // Check if badge has certificate in Base64
+      final certificadoBase64 = widget.badge['certificado'];
+      if (certificadoBase64 == null || certificadoBase64.isEmpty) {
+        throw Exception('Certificado não disponível');
+      }
+
+      // Show loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('A preparar certificado...')),
+      );
+
+      // Decode Base64 to bytes
+      final pdfBytes = base64.decode(certificadoBase64);
+
+      // Save to temporary file
+      final tempDir = await getTemporaryDirectory();
+      final fileName = '${widget.badge['nome']?.replaceAll(' ', '_') ?? 'certificado'}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(pdfBytes);
+
+      // Share via Share Sheet
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: 'Certificado: ${widget.badge['nome']}',
+        text: 'Conquistei o certificado "${widget.badge['nome']}"! 🎖️',
+      );
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 }
+
 
 class _CandidaturaDialog extends StatefulWidget {
   final dynamic badge;
