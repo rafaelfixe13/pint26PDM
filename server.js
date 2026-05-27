@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { createCanvas, loadImage } = require('canvas');
 
 const app = express();
 app.use(cors());
@@ -19,9 +20,30 @@ const pool = new Pool({
   port: 5432,
 });
 
+// Helper: verifica se uma tabela existe na BD (schema.public)
+async function tableExists(tableName) {
+  try {
+    const result = await pool.query("SELECT to_regclass($1) as r", [tableName]);
+    return result.rows[0] && result.rows[0].r !== null;
+  } catch (err) {
+    console.error("Erro ao verificar existência de tabela:", err.message);
+    return false;
+  }
+}
+
+// Garantir colunas para armazenar imagem do badge em candidaturasbadge
+async function ensureBadgeImageColumns() {
+  try {
+    await pool.query("ALTER TABLE candidaturasbadge ADD COLUMN IF NOT EXISTS badge_image_base64 TEXT");
+  } catch (err) {
+    console.error('Erro ao garantir colunas badge_image:', err.message || err);
+  }
+}
+
 // ─── PASTAS DE UPLOAD ────────────────────────────────────
 if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
 if (!fs.existsSync("./uploads/candidaturas")) fs.mkdirSync("./uploads/candidaturas");
+if (!fs.existsSync("./uploads/badges")) fs.mkdirSync("./uploads/badges");
 
 // ─── STORAGE MULTER ──────────────────────────────────────
 const storage = multer.diskStorage({
@@ -88,21 +110,7 @@ async function calcularProgressoBadge(client, userId, badgeId, idCandidatura) {
     `,
     [idCandidatura, progressoAtual, progressoTotal]
   );
-
-  await client.query(
-    `
-    INSERT INTO utilizador_badge
-      (user_id, badge_id, progresso_atual, progresso_total, conquistado, data_conquista, created_at, updated_at)
-    VALUES
-      ($1, $2, $3, $4, FALSE, NULL, NOW(), NOW())
-    ON CONFLICT (user_id, badge_id)
-    DO UPDATE SET
-      progresso_atual = EXCLUDED.progresso_atual,
-      progresso_total = EXCLUDED.progresso_total,
-      updated_at = NOW()
-    `,
-    [userId, badgeId, progressoAtual, progressoTotal]
-  );
+  // Note: we no longer write to `utilizador_badge` from the server.
 
   return {
     progressoAtual,
@@ -252,6 +260,10 @@ app.get("/debug/serviceline", async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 app.get("/badges", async (req, res) => {
   try {
+    if (!(await tableExists('public.badges'))) {
+      // Tabela de badges não existe: retornar lista vazia para evitar crash na app
+      return res.json([]);
+    }
     const result = await pool.query("SELECT * FROM badges ORDER BY idbadge ASC");
     res.json(result.rows);
   } catch (err) {
@@ -262,6 +274,11 @@ app.get("/badges", async (req, res) => {
 
 app.get("/badges/recomendados/:userId", async (req, res) => {
   try {
+    if (!(await tableExists('public.badges'))) {
+      // Se a tabela de badges não existir, devolve lista vazia
+      return res.json([]);
+    }
+
     const userId = parseInt(req.params.userId, 10);
 
     if (isNaN(userId)) {
@@ -302,47 +319,7 @@ app.get("/badges/recomendados/:userId", async (req, res) => {
   }
 });
 
-app.get("/badges/recomendados/:userId", async (req, res) => {
-  try {
-    const userId = parseInt(req.params.userId, 10);
 
-    if (isNaN(userId)) {
-      return res.status(400).json({ error: "ID do utilizador inválido" });
-    }
-
-    // Primeiro obter o idarea do utilizador
-    const userResult = await pool.query(
-      "SELECT idarea FROM utilizadores WHERE idutilizador = $1",
-      [userId]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "Utilizador não encontrado" });
-    }
-
-    const idArea = userResult.rows[0].idarea;
-
-    if (!idArea) {
-      // Se o utilizador não tem área, retorna lista vazia
-      return res.json([]);
-    }
-
-    const result = await pool.query(
-      `
-      SELECT b.*
-      FROM badges b
-      WHERE b.idarea = $1
-      ORDER BY b.idbadge ASC
-      `,
-      [idArea]
-    );
-
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Erro ao buscar badges recomendados:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 app.get("/badges/:id/requisitos", async (req, res) => {
   try {
@@ -390,40 +367,68 @@ app.get("/utilizadores/:id/candidaturas", async (req, res) => {
     if (isNaN(idUtilizador)) {
       return res.status(400).json({ error: "ID do utilizador inválido" });
     }
+    const badgesExist = await tableExists('public.badges');
 
-    const result = await pool.query(`
-      SELECT
-        cb.idcandidatura,
-        cb.user_id,
-        cb.badge_id,
-        cb.estado,
-        cb.datasubmissao,
-        cb.comentariogeral,
-        cb.datacriacao,
-        cb.progresso_atual,
-        cb.progresso_total,
-        CASE
-          WHEN cb.progresso_total > 0
-           AND cb.progresso_atual >= cb.progresso_total
-            THEN 'Submetido'
-          ELSE CONCAT(cb.progresso_atual, '/', cb.progresso_total)
-        END AS estado_visual,
-        b.idbadge,
-        b.nome,
-        b.descricao,
-        b.imagemurl,
-        b.idnivel,
-        b.pontos,
-        b.linkpublicobase,
-        b.competencias,
-        b.certificado
-      FROM candidaturasbadge cb
-      INNER JOIN badges b ON b.idbadge = cb.badge_id
-      WHERE cb.user_id = $1
-      ORDER BY cb.datacriacao DESC
-    `, [idUtilizador]);
+    if (badgesExist) {
+      const result = await pool.query(`
+        SELECT
+          cb.idcandidatura,
+          cb.user_id,
+          cb.badge_id,
+          cb.estado,
+          cb.datasubmissao,
+          cb.comentariogeral,
+          cb.datacriacao,
+          cb.progresso_atual,
+          cb.progresso_total,
+          CASE
+            WHEN cb.progresso_total > 0
+             AND cb.progresso_atual >= cb.progresso_total
+              THEN 'Submetido'
+            ELSE CONCAT(cb.progresso_atual, '/', cb.progresso_total)
+          END AS estado_visual,
+          b.idbadge,
+          b.nome,
+          b.descricao,
+          b.imagemurl,
+          b.idnivel,
+          b.pontos,
+          b.linkpublicobase,
+          b.competencias,
+          b.certificado
+        FROM candidaturasbadge cb
+        INNER JOIN badges b ON b.idbadge = cb.badge_id
+        WHERE cb.user_id = $1
+        ORDER BY cb.datacriacao DESC
+      `, [idUtilizador]);
 
-    res.json(result.rows);
+      res.json(result.rows);
+    } else {
+      // Fallback sem a tabela badges: devolve candidaturas sem os campos da tabela badges
+      const result = await pool.query(`
+        SELECT
+          cb.idcandidatura,
+          cb.user_id,
+          cb.badge_id,
+          cb.estado,
+          cb.datasubmissao,
+          cb.comentariogeral,
+          cb.datacriacao,
+          cb.progresso_atual,
+          cb.progresso_total,
+          CASE
+            WHEN cb.progresso_total > 0
+             AND cb.progresso_atual >= cb.progresso_total
+              THEN 'Submetido'
+            ELSE CONCAT(cb.progresso_atual, '/', cb.progresso_total)
+          END AS estado_visual
+        FROM candidaturasbadge cb
+        WHERE cb.user_id = $1
+        ORDER BY cb.datacriacao DESC
+      `, [idUtilizador]);
+
+      res.json(result.rows);
+    }
   } catch (err) {
     console.error("Erro ao carregar candidaturas:", err.message);
     res.status(500).json({ error: err.message });
@@ -685,27 +690,32 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
       return res.status(400).json({ error: "ID do utilizador inválido" });
     }
 
+    if (!(await tableExists('public.badges'))) {
+      // Sem tabela de badges: não tentar fazer joins; devolve lista vazia
+      return res.json([]);
+    }
+
+    // Return badges joined with candidaturasbadge only; do not query utilizador_badge.
     const result = await pool.query(
       `
       SELECT 
         b.*,
-        COALESCE(ub.progresso_atual, 0) as progresso_atual,
-        COALESCE(ub.progresso_total, requisitos_count.total) as progresso_total,
-        COALESCE(ub.conquistado, FALSE) as conquistado,
-        COALESCE(ub.data_conquista, NULL) as data_conquista,
-        COALESCE(ub.created_at, NOW()) as created_at,
-        COALESCE(ub.updated_at, NOW()) as updated_at,
+        COALESCE(cb.progresso_atual, 0) as progresso_atual,
+        COALESCE(cb.progresso_total, requisitos_count.total) as progresso_total,
+        FALSE as conquistado,
+        NULL as data_conquista,
+        NOW() as created_at,
+        NOW() as updated_at,
         cb.estado,
         cb.datasubmissao,
         CASE
-          WHEN COALESCE(ub.progresso_atual, 0) >= COALESCE(ub.progresso_total, requisitos_count.total) 
+          WHEN COALESCE(cb.progresso_atual, 0) >= COALESCE(cb.progresso_total, requisitos_count.total) 
           AND requisitos_count.total > 0
             THEN 'Submetido'
-          ELSE CONCAT(COALESCE(ub.progresso_atual, 0), '/', COALESCE(ub.progresso_total, requisitos_count.total))
+          ELSE CONCAT(COALESCE(cb.progresso_atual, 0), '/', COALESCE(cb.progresso_total, requisitos_count.total))
         END AS estado_visual
       FROM badges b
       LEFT JOIN candidaturasbadge cb ON cb.badge_id = b.idbadge AND cb.user_id = $1
-      LEFT JOIN utilizador_badge ub ON ub.user_id = $1 AND ub.badge_id = b.idbadge
       LEFT JOIN LATERAL (
         SELECT COUNT(*)::int as total
         FROM requisitos
@@ -1031,6 +1041,171 @@ app.delete("/notificacoes/:id", async (req, res) => {
 // ─────────────────────────────────────────────────────────
 // START
 // ─────────────────────────────────────────────────────────
-app.listen(3000, "0.0.0.0", () => {
-  console.log("Servidor a correr em http://0.0.0.0:3000");
+// Garantir colunas e só depois iniciar o servidor
+ensureBadgeImageColumns()
+  .then(() => {
+    app.listen(3000, "0.0.0.0", () => {
+      console.log("Servidor a correr em http://0.0.0.0:3000");
+    });
+  })
+  .catch((err) => {
+    console.error('Erro ao garantir colunas ou iniciar servidor:', err.message || err);
+    // Ainda tentamos iniciar o servidor mesmo se a garantia falhar
+    app.listen(3000, "0.0.0.0", () => {
+      console.log("Servidor a correr em http://0.0.0.0:3000 (com warnings)");
+    });
+  });
+
+// ─────────────────────────────────────────────────────────
+// GERA IMAGEM DO BADGE (badge + user info) -> retorna URL/png base64
+// POST /badges/:id/generate-image  body: { user_id: number }
+// ─────────────────────────────────────────────────────────
+app.post('/badges/:id/generate-image', async (req, res) => {
+  const badgeId = parseInt(req.params.id, 10);
+  const userIdRaw = req.body?.user_id ?? req.query?.user_id;
+  const userId = parseInt(userIdRaw, 10);
+
+  if (isNaN(badgeId) || isNaN(userId)) {
+    return res.status(400).json({ error: 'badge id and user_id are required' });
+  }
+
+  try {
+    if (!(await tableExists('public.badges'))) {
+      return res.status(404).json({ error: 'Tabela de badges não encontrada' });
+    }
+      // Antes de carregar dados e gerar a imagem, verificar se existe uma candidatura
+      const candCheck = await pool.query(
+        'SELECT idcandidatura FROM candidaturasbadge WHERE user_id = $1 AND badge_id = $2 LIMIT 1',
+        [userId, badgeId]
+      );
+
+      if (candCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Nenhuma candidatura encontrada para este utilizador e badge' });
+      }
+
+      // load badge and user
+      const badgeRes = await pool.query('SELECT idbadge, nome, descricao, imagemurl FROM badges WHERE idbadge = $1', [badgeId]);
+      const userRes = await pool.query('SELECT idutilizador, nome, fotourl FROM utilizadores WHERE idutilizador = $1', [userId]);
+
+    if (badgeRes.rows.length === 0) return res.status(404).json({ error: 'badge not found' });
+    if (userRes.rows.length === 0) return res.status(404).json({ error: 'user not found' });
+
+    const badge = badgeRes.rows[0];
+    const user = userRes.rows[0];
+
+    // Canvas size (LinkedIn recommended social card ~1200x630)
+    const width = 1200;
+    const height = 630;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // background
+    ctx.fillStyle = '#F9FAFB';
+    ctx.fillRect(0, 0, width, height);
+
+    // white card
+    ctx.fillStyle = '#FFFFFF';
+    const pad = 40;
+    ctx.fillRect(pad, pad, width - pad * 2, height - pad * 2);
+
+    // draw badge image (if exists)
+    try {
+      if (badge.imagemurl) {
+        const badgeImg = await loadImage(badge.imagemurl);
+        const bsize = 180;
+        ctx.drawImage(badgeImg, pad + 20, pad + 40, bsize, bsize);
+      }
+    } catch (e) {
+      console.warn('Failed to load badge image', e.message || e);
+    }
+
+    // draw user photo (if exists)
+    try {
+      if (user.fotourl) {
+        let userSrc = user.fotourl;
+        // handle base64 stored directly
+        if (!userSrc.startsWith('data:') && /^[A-Za-z0-9+/=\s]+$/.test(userSrc) && userSrc.length > 200) {
+          userSrc = `data:image/png;base64,${userSrc}`;
+        }
+        const uimg = await loadImage(userSrc);
+        const usz = 120;
+        const ux = width - pad - usz - 20;
+        const uy = pad + 40;
+        // circle clip
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(ux + usz / 2, uy + usz / 2, usz / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(uimg, ux, uy, usz, usz);
+        ctx.restore();
+      }
+    } catch (e) {
+      console.warn('Failed to load user image', e.message || e);
+    }
+
+    // Text: badge name
+    ctx.fillStyle = '#0F172A';
+    ctx.font = 'bold 48px Sans';
+    ctx.fillText(badge.nome || 'Badge', 240, 160);
+
+    // Text: badge description (smaller)
+    ctx.fillStyle = '#475569';
+    ctx.font = '24px Sans';
+    const desc = badge.descricao ? String(badge.descricao).slice(0, 180) : '';
+    ctx.fillText(desc, 240, 210);
+
+    // Text: user name
+    ctx.fillStyle = '#0F172A';
+    ctx.font = '28px Sans';
+    ctx.fillText(user.nome || '', 240, 280);
+
+    // Footer / date
+    ctx.fillStyle = '#64748B';
+    ctx.font = '18px Sans';
+    const dateStr = new Date().toLocaleDateString();
+    ctx.fillText(`Conquistado em ${dateStr}`, 240, height - 80);
+
+    const buffer = canvas.toBuffer('image/png');
+
+    // convert to base64 and store in candidaturasbadge (only base64)
+    try {
+      const base64str = buffer.toString('base64');
+      const idCandidatura = candCheck.rows[0].idcandidatura;
+      await pool.query(
+        'UPDATE candidaturasbadge SET badge_image_base64 = $1 WHERE idcandidatura = $2',
+        [base64str, idCandidatura]
+      );
+
+      // respond with base64 for convenience
+      return res.json({ base64: base64str });
+    } catch (err) {
+      console.error('Erro ao salvar imagem do badge na candidaturasbadge:', err.message || err);
+      // respond with base64 even if DB save fails
+      return res.json({ base64: buffer.toString('base64') });
+    }
+  } catch (err) {
+    console.error('Erro ao gerar imagem do badge:', err.message || err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+// Recuperar imagem do badge armazenada numa candidatura
+app.get('/candidaturas/:id/badge-image', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: 'ID de candidatura inválido' });
+
+    const result = await pool.query(
+      'SELECT badge_image_base64 FROM candidaturasbadge WHERE idcandidatura = $1 LIMIT 1',
+      [id]
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Candidatura não encontrada' });
+
+    res.json({ base64: result.rows[0].badge_image_base64 });
+  } catch (err) {
+    console.error('Erro ao recuperar imagem da candidatura:', err.message || err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
 });

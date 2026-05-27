@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import '../widgets/base64_image_widget.dart';
+import '../services/session.dart';
 
 class BadgeDetailPage extends StatefulWidget {
   final dynamic badge;
@@ -48,7 +49,7 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
           if (isApproved)
             IconButton(
               icon: Icon(Icons.business, color: Color(0xFF0A66C2)),
-              onPressed: _abrirLinkedIn,
+              onPressed: _shareBadgeImageLinkedIn,
               tooltip: 'Partilhar no LinkedIn',
             ),
           IconButton(
@@ -940,6 +941,65 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _shareBadgeImageLinkedIn() async {
+    try {
+      final badge = widget.badge;
+      final badgeId = badge['idbadge'] ?? badge['id'] ?? badge['badge_id'];
+
+      if (badgeId == null) {
+        throw Exception('ID do badge inválido');
+      }
+
+      // Show loading
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      // Call server to generate image (returns base64)
+      final userId = Session.id;
+      final uri = Uri.parse('${ApiService.baseUrl}/badges/$badgeId/generate-image?user_id=$userId');
+      final resp = await http.post(uri);
+
+      if (resp.statusCode != 200) {
+        throw Exception('Erro ao gerar imagem: ${resp.statusCode}');
+      }
+
+      final data = json.decode(resp.body);
+      final base64str = data['base64'] as String?;
+
+      if (base64str == null || base64str.isEmpty) {
+        throw Exception('Imagem não recebida do servidor');
+      }
+
+      final bytes = base64.decode(base64str);
+
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'badge_${badgeId}_${DateTime.now().millisecondsSinceEpoch}.png';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(bytes);
+
+      final shareText = '🎉 Conquistei o badge "${badge['nome']}"! #SoftinsaTalent';
+
+      if (mounted) Navigator.pop(context);
+
+      // Use share sheet (Share Plus). The user can pick LinkedIn.
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'image/png')],
+        text: shareText,
+        subject: 'Badge: ${badge['nome']}',
+      );
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao partilhar no LinkedIn: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 }
