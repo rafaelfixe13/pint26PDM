@@ -3,8 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../services/session.dart';
 import '../services/api_service.dart';
 import '../base64_image_widget.dart';
-import '../widgets/badge_progress.dart';
 import './edit_photo_page.dart';
+import './badge_detail_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -305,155 +305,190 @@ class _ProfilePageState extends State<ProfilePage> {
                     final badge = _badgesConquistados[index];
                     final imagem = badge['imagem']?.toString() ?? '';
                     final nome = badge['nome']?.toString() ?? 'Badge';
-                    // descricao is not displayed in the list item; remove unused local
-                    final progressoAtual =
-                        int.tryParse('${badge['progresso_atual'] ?? 0}') ?? 0;
-                    final progressoTotal =
-                        int.tryParse('${badge['progresso_total'] ?? 0}') ?? 0;
-                    final dataConquista =
-                        _formatarData(badge['data_conquista']);
+                    final descricao = badge['descricao']?.toString() ?? '';
+                    
+                    final dataConquista = _formatarData(badge['data_conquista']);
 
-                    return Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 0),
+                      child: Material(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 6,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: imagem.isNotEmpty
-                                ? (Base64ImageWidget.isBase64(imagem)
-                                    ? Base64ImageWidget(
-                                        imageData: imagem,
-                                        width: 78,
-                                        height: 78,
-                                        fit: BoxFit.cover,
-                                      )
-                                    : CachedNetworkImage(
-                                        imageUrl: imagem
-                                            .replaceAll('localhost', '10.0.2.2')
-                                            .replaceAll('127.0.0.1', '10.0.2.2')
-                                            .replaceAll('100.105.58.22', '10.0.2.2')
-                                            .replaceAll('0.0.0.0', '10.0.2.2'),
-                                        width: 78,
-                                        height: 78,
-                                        fit: BoxFit.cover,
-                                        placeholder: (context, url) => Container(
-                                          width: 78,
-                                          height: 78,
-                                          color: Colors.grey.shade200,
-                                          child: const Center(
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Color(0xFF2563EB),
-                                            ),
-                                          ),
-                                        ),
-                                        errorWidget: (context, url, error) => Container(
-                                          width: 78,
-                                          height: 78,
-                                          color: Colors.blue.shade50,
-                                          child: const Icon(
-                                            Icons.emoji_events,
-                                            color: Colors.blue,
-                                            size: 34,
-                                          ),
-                                        ),
-                                      ))
-                                : Container(
-                                    width: 78,
-                                    height: 78,
-                                    color: Colors.blue.shade50,
-                                    child: const Icon(
-                                      Icons.emoji_events,
-                                      color: Colors.blue,
-                                      size: 34,
-                                    ),
-                                  ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
+                        elevation: 2,
+                        shadowColor: Colors.black12,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => BadgeDetailPage(badge: badge, candidatura: badge['candidatura']),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: Text(
-                                        nome,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: imagem.isNotEmpty
+                                          ? (Base64ImageWidget.isBase64(imagem)
+                                              ? Base64ImageWidget(
+                                                  imageData: imagem,
+                                                  width: 56,
+                                                  height: 56,
+                                                  fit: BoxFit.cover,
+                                                )
+                                              : Image.network(
+                                                  imagem.replaceAll('localhost', '10.0.2.2').replaceAll('127.0.0.1', '10.0.2.2').replaceAll('100.105.58.22', '10.0.2.2').replaceAll('0.0.0.0', '10.0.2.2'),
+                                                  width: 56,
+                                                  height: 56,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) => Container(
+                                                    width: 56,
+                                                    height: 56,
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFEFF6FF),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.emoji_events,
+                                                      color: Color(0xFF2563EB),
+                                                      size: 28,
+                                                    ),
+                                                  ),
+                                                ))
+                                          : Container(
+                                              width: 56,
+                                              height: 56,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFEFF6FF),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: const Icon(
+                                                Icons.emoji_events,
+                                                color: Color(0xFF2563EB),
+                                                size: 28,
+                                              ),
+                                            ),
                                     ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.shade100,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Icon(
-                                            Icons.check,
-                                            color: Colors.green,
-                                            size: 14,
+                                          Text(
+                                            nome,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF1E3A5F),
+                                            ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          SizedBox(
-                                            width: 80,
-                                            child: BadgeProgress(
-                                              atual: progressoAtual,
-                                              total: progressoTotal,
-                                              compact: true,
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            descricao.isEmpty ? 'Sem descrição disponível.' : descricao,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey,
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        'Conquistado em $dataConquista',
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE6F4EA),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: const Text(
+                                        'Aprovado',
                                         style: TextStyle(
+                                          color: Color(0xFF059669),
                                           fontSize: 12,
-                                          color: Colors.grey[700],
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 14),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black,
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        'Nível: ${badge['nivel'] ?? 'N/A'}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Icon(Icons.star, color: Colors.amber, size: 18),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${badge['pontos'] ?? 0} pts',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.calendar_today_outlined,
+                                      size: 14,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        dataConquista,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                    const Text(
+                                      'Abrir badge',
+                                      style: TextStyle(
+                                        color: Color(0xFF2563EB),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 14,
+                                      color: Color(0xFF2563EB),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     );
                   },
