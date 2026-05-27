@@ -66,12 +66,12 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
         actions: [
           if (isApproved)
             IconButton(
-              icon: const Icon(Icons.business, color: Color(0xFF0A66C2)),
+              icon: const Icon(Icons.share, color: Color(0xFF0A66C2)),
               onPressed: _shareBadgeImageLinkedIn,
-              tooltip: 'Partilhar no LinkedIn',
+              tooltip: 'Partilhar',
             ),
           IconButton(
-            icon: const Icon(Icons.share, color: Colors.black),
+            icon: const Icon(Icons.picture_as_pdf, color: Colors.black),
             onPressed: _compartilharPDF,
             tooltip: 'Partilhar Certificado',
           ),
