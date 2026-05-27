@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../services/session.dart';
 
@@ -9,6 +8,62 @@ class ApiService {
   static bool _isJson(String body) {
     final text = body.trim();
     return text.startsWith('{') || text.startsWith('[');
+  }
+
+  static Future<String> atualizarFotoBase64(int idUtilizador, String fotoBase64) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/utilizadores/$idUtilizador/foto-base64'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'foto_base64': fotoBase64}),
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = _decodeJsonSafely(response) as Map<String, dynamic>;
+      return decoded['foto_base64']?.toString() ?? '';
+    }
+
+    throw Exception(_extractErrorMessage(response, fallback: 'Erro ao atualizar foto'));
+  }
+
+  static Future<List<dynamic>> getAreas() async {
+    final response = await http.get(Uri.parse('$baseUrl/areas'));
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as List;
+    }
+
+    throw Exception(_extractErrorMessage(response, fallback: 'Erro ao obter áreas'));
+  }
+
+  static Future<List<dynamic>> getNiveis() async {
+    final response = await http.get(Uri.parse('$baseUrl/niveis'));
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as List;
+    }
+
+    throw Exception(_extractErrorMessage(response, fallback: 'Erro ao obter níveis'));
+  }
+
+  static Future<List<dynamic>> getEspeciais() async {
+    final response = await http.get(Uri.parse('$baseUrl/especialidades'));
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as List;
+    }
+    // If endpoint not found, return empty list instead of throwing to
+    // allow the client to continue (server may not expose this endpoint).
+    if (response.statusCode == 404) return <dynamic>[];
+
+    throw Exception(_extractErrorMessage(response, fallback: 'Erro ao obter especialidades'));
+  }
+
+  static Future<void> recarregarDadosUtilizador() async {
+    final response = await http.get(Uri.parse('$baseUrl/utilizadores/me'));
+    if (response.statusCode == 200) {
+      final decoded = _decodeJsonSafely(response) as Map<String, dynamic>;
+      Session.iniciar(decoded);
+      return;
+    }
+
+    throw Exception(_extractErrorMessage(response, fallback: 'Erro ao recarregar dados do utilizador'));
   }
 
   static dynamic _decodeJsonSafely(http.Response response) {
@@ -57,6 +112,29 @@ class ApiService {
       _extractErrorMessage(response, fallback: 'Erro ao carregar badges'),
     );
   }
+
+  static Future<List<dynamic>> getBadgesRecomendados(int userId) async {
+    if (userId == 0) {
+      throw Exception('Sessão inválida. Faz login novamente.');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/badges/recomendados/$userId'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as List;
+    }
+
+    throw Exception(
+      _extractErrorMessage(
+        response,
+        fallback: 'Erro ao carregar badges recomendados',
+      ),
+    );
+  }
+
 
   static Future<List<dynamic>> getBadgesDoUtilizador() async {
     final userId = Session.id;

@@ -47,23 +47,24 @@ class _OptionsPageState extends State<OptionsPage> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (mounted) {
+        setState(() {
+          _rgpd = !_rgpd;
+        });
 
-      setState(() {
-        _rgpd = !_rgpd;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao atualizar RGPD: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao atualizar RGPD: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _aGuardarRgpd = false;
-      });
+      if (mounted) {
+        setState(() {
+          _aGuardarRgpd = false;
+        });
+      }
     }
   }
 
@@ -129,7 +130,7 @@ class _OptionsPageState extends State<OptionsPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ChangePasswordPage(),
+                  builder: (_) => const ChangePasswordPage(),
                 ),
               );
             },
@@ -165,7 +166,7 @@ class _OptionsPageState extends State<OptionsPage> {
               ),
               value: _rgpd,
               onChanged: _aGuardarRgpd ? null : _atualizarRgpd,
-              activeColor: const Color(0xFF3F6AA3),
+              activeThumbColor: const Color(0xFF3F6AA3),
             ),
           ),
 
@@ -216,7 +217,7 @@ class _OptionsPageState extends State<OptionsPage> {
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF9DBCF2),
+        activeThumbColor: const Color(0xFF9DBCF2),
         activeTrackColor: const Color(0xFF9DBCF2),
       ),
     );

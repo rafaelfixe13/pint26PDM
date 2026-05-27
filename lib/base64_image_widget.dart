@@ -14,7 +14,7 @@ class Base64ImageWidget extends StatelessWidget {
   final Widget? errorWidget;
   final BorderRadius? borderRadius;
 
-  const Base64ImageWidget({
+  const Base64ImageWidget({super.key, 
     required this.imageData,
     required this.width,
     required this.height,
@@ -80,7 +80,7 @@ class Base64ImageWidget extends StatelessWidget {
                   borderRadius: borderRadius,
                   color: Colors.grey[200],
                 ),
-                child: errorWidget ?? Icon(Icons.broken_image),
+                child: errorWidget ?? const Icon(Icons.broken_image),
               );
             },
           ),
@@ -94,7 +94,7 @@ class Base64ImageWidget extends StatelessWidget {
             borderRadius: borderRadius,
             color: Colors.red[100],
           ),
-          child: errorWidget ?? Icon(Icons.error),
+          child: errorWidget ?? const Icon(Icons.error),
         );
       }
     }
@@ -110,7 +110,7 @@ class Base64ImageWidget extends StatelessWidget {
         placeholder: (context, url) => 
             placeholder ?? _buildPlaceholder(),
         errorWidget: (context, url, error) => 
-            errorWidget ?? Icon(Icons.broken_image),
+            errorWidget ?? const Icon(Icons.broken_image),
       ),
     );
   }
@@ -120,7 +120,7 @@ class Base64ImageWidget extends StatelessWidget {
       width: width,
       height: height,
       color: Colors.grey[200],
-      child: Center(
+      child: const Center(
         child: CircularProgressIndicator(
           strokeWidth: 2,
         ),

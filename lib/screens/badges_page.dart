@@ -1,22 +1,37 @@
 import 'package:flutter/material.dart';
+import '../base64_image_widget.dart';
 import '../services/api_service.dart';
 import 'badge_detail_page.dart';
+import '../widgets/badge_progress.dart';
 
 class BadgesPage extends StatefulWidget {
+  const BadgesPage({super.key});
+
   @override
   State<BadgesPage> createState() => _BadgesPageState();
 }
 
 class _BadgesPageState extends State<BadgesPage> {
   late Future<List<dynamic>> _badgesFuture;
+  late Future<List<dynamic>> _areasFuture;
+  late Future<List<dynamic>> _nivelsFuture;
+  late Future<List<dynamic>> _especiaisFuture;
 
   List<dynamic> _todos = [];       // lista completa da API
   List<dynamic> _visiveis = [];    // lista filtrada + lazy
-  List<dynamic> _filtrados = [];   // lista após pesquisa
+  List<dynamic> _filtrados = [];   // lista após pesquisa
+  List<dynamic> _areas = [];       // lista de áreas
+  List<dynamic> _niveis = [];      // lista de níveis
+  List<dynamic> _especiais = [];   // lista de especiais
 
   final int _porPagina = 6;        // quantos carregar de cada vez
   int _carregados = 0;
   bool _temMais = false;
+
+  // Filtros
+  String? _selectedArea;
+  int? _selectedNivel;
+  int? _selectedEspecial;
 
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -51,11 +66,29 @@ class _BadgesPageState extends State<BadgesPage> {
   void _loadData() {
     setState(() {
       _badgesFuture = ApiService.getBadgesDoUtilizador();
+      _areasFuture = ApiService.getAreas();
+      _nivelsFuture = ApiService.getNiveis();
+      _especiaisFuture = ApiService.getEspeciais();
     });
     _badgesFuture.then((lista) {
       setState(() {
         _todos = lista;
         _filtrar(_searchController.text);
+      });
+    });
+    _areasFuture.then((lista) {
+      setState(() {
+        _areas = lista;
+      });
+    });
+    _nivelsFuture.then((lista) {
+      setState(() {
+        _niveis = lista;
+      });
+    });
+    _especiaisFuture.then((lista) {
+      setState(() {
+        _especiais = lista;
       });
     });
   }
@@ -79,7 +112,6 @@ class _BadgesPageState extends State<BadgesPage> {
   }
 
   void _carregarMais() {
-    final proximo = _carregados + _porPagina;
     final novos = _filtrados.skip(_carregados).take(_porPagina).toList();
     setState(() {
       _visiveis.addAll(novos);
@@ -91,29 +123,29 @@ class _BadgesPageState extends State<BadgesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF0F0F0),
+      backgroundColor: const Color(0xFFF0F0F0),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
         title: Container(
           height: 40,
           decoration: BoxDecoration(
-            color: Color(0xFFF1F5F9),
+            color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(30),
           ),
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Pesquisar badge...',
-              hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
-              prefixIcon: Icon(Icons.search, color: Colors.grey),
+              hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+              prefixIcon: const Icon(Icons.search, color: Colors.grey),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.clear, color: Colors.grey, size: 18),
+                      icon: const Icon(Icons.clear, color: Colors.grey, size: 18),
                       onPressed: () {
                         _searchController.clear();
                         _filtrar('');
@@ -121,110 +153,204 @@ class _BadgesPageState extends State<BadgesPage> {
                     )
                   : null,
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          _searchController.clear();
-          _loadData();
-          await _badgesFuture;
-        },
-        child: FutureBuilder<List<dynamic>>(
-          future: _badgesFuture,
-          builder: (context, snapshot) {
-            // loading inicial
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                _todos.isEmpty) {
-              return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(height: 400),
-                  Center(child: CircularProgressIndicator()),
-                ],
-              );
-            }
+      body: Column(
+        children: [
+          // Filtros
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Filtro de Nível
+                Expanded(
+                  child: DropdownButtonFormField<int?>(
+                    initialValue: _selectedNivel,
+                    decoration: InputDecoration(
+                      labelText: 'Nível',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: [
+                      const DropdownMenuItem<int?>(value: null, child: Text('Todos')),
+                      ..._niveis.map((nivel) => DropdownMenuItem<int?>(
+                        value: nivel['idnivel'],
+                        child: Text(nivel['nome'] ?? 'Nível ${nivel['idnivel']}'),
+                      )),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedNivel = value);
+                      _filtrar(_searchController.text);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Filtro de Área
+                Expanded(
+                  child: DropdownButtonFormField<String?>(
+                    initialValue: _selectedArea,
+                    decoration: InputDecoration(
+                      labelText: 'Área',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(value: null, child: Text('Todas')),
+                      ..._areas.map((area) => DropdownMenuItem<String?>(
+                        value: area['idarea'].toString(),
+                        child: Text(area['nome'] ?? 'Sem nome'),
+                      )),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedArea = value);
+                      _filtrar(_searchController.text);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Filtro de Especial
+          Padding(
+            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<int?>(
+                    initialValue: _selectedEspecial,
+                    decoration: InputDecoration(
+                      labelText: 'Especial',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: [
+                      const DropdownMenuItem<int?>(value: null, child: Text('Todos')),
+                      ..._especiais.map((especial) => DropdownMenuItem<int?>(
+                        value: especial['idespecial'],
+                        child: Text(especial['nome'] ?? 'Especial ${especial['idespecial']}'),
+                      )),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedEspecial = value);
+                      _filtrar(_searchController.text);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Lista de badges
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                _searchController.clear();
+                _loadData();
+                await _badgesFuture;
+              },
+              child: FutureBuilder<List<dynamic>>(
+                future: _badgesFuture,
+                builder: (context, snapshot) {
+                  // loading inicial
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      _todos.isEmpty) {
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 400),
+                        Center(child: CircularProgressIndicator()),
+                      ],
+                    );
+                  }
 
-            if (snapshot.hasError && _todos.isEmpty) {
-              return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(height: 400),
-                  Center(child: Text('Erro: ${snapshot.error}')),
-                ],
-              );
-            }
-
-            if (_visiveis.isEmpty && _searchController.text.isNotEmpty) {
-              return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(height: 400),
-                  Center(
-                    child: Column(
+                  if (snapshot.hasError && _todos.isEmpty) {
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        Icon(Icons.search_off, size: 48, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text(
-                          'Nenhum badge encontrado',
-                          style: TextStyle(color: Colors.grey),
+                        const SizedBox(height: 400),
+                        Center(child: Text('Erro: ${snapshot.error}')),
+                      ],
+                    );
+                  }
+
+                  if (_visiveis.isEmpty && _searchController.text.isNotEmpty) {
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 400),
+                        Center(
+                          child: Column(
+                            children: [
+                              Icon(Icons.search_off, size: 48, color: Colors.grey),
+                              SizedBox(height: 8),
+                              Text(
+                                'Nenhum badge encontrado',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                    ),
-                  ),
-                ],
-              );
-            }
+                    );
+                  }
 
-            if (_visiveis.isEmpty) {
-              return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(height: 400),
-                  Center(child: Text('Sem badges')),
-                ],
-              );
-            }
+                  if (_visiveis.isEmpty) {
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 400),
+                        Center(child: Text('Sem badges')),
+                      ],
+                    );
+                  }
 
-            return GridView.builder(
-              controller: _scrollController,
-              physics: AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.all(12),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.58,
-              ),
-              // +1 para o indicador de "a carregar mais" no fundo
-              itemCount: _visiveis.length + (_temMais ? 1 : 0),
-              itemBuilder: (context, index) {
-                // último item = indicador de carregamento
-                if (index == _visiveis.length) {
-                  return Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                  return GridView.builder(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.58,
                     ),
+                    itemCount: _visiveis.length + (_temMais ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      // último item = indicador de carregamento
+                      if (index == _visiveis.length) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      }
+
+                      final badge = _visiveis[index];
+                      return GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => BadgeDetailPage(badge: badge),
+                          ),
+                        ),
+                        child: _BadgeCard(badge: badge),
+                      );
+                    },
                   );
-                }
-
-                final badge = _visiveis[index];
-                return GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => BadgeDetailPage(badge: badge),
-                    ),
-                  ),
-                  child: _BadgeCard(badge: badge),
-                );
-              },
-            );
-          },
-        ),
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -245,30 +371,36 @@ class _BadgeCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
       ),
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          badge['imagemurl'] != null &&
-                  badge['imagemurl'].toString().isNotEmpty
-              ? Image.network(
+            badge['imagemurl'] != null && badge['imagemurl'].toString().isNotEmpty
+              ? (Base64ImageWidget.isBase64(badge['imagemurl'].toString())
+                ? Base64ImageWidget(
+                  imageData: badge['imagemurl'].toString(),
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.contain,
+                )
+                : Image.network(
                   badge['imagemurl'],
                   width: 80,
                   height: 80,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Icon(Icons.emoji_events,
-                      size: 80, color: Color(0xFF2563EB)),
-                )
-              : Icon(Icons.emoji_events, size: 80, color: Color(0xFF2563EB)),
+                  errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events,
+                    size: 80, color: Color(0xFF2563EB)),
+                ))
+              : const Icon(Icons.emoji_events, size: 80, color: Color(0xFF2563EB)),
 
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
 
           Text(
             badge['nome'] ?? '',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF2563EB),
                 fontSize: 13),
@@ -276,73 +408,59 @@ class _BadgeCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
 
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
 
           Text(
             badge['descricao'] ?? '',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 10, color: Colors.grey),
+            style: const TextStyle(fontSize: 10, color: Colors.grey),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
 
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
 
           Row(
             children: [
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                     color: Colors.black,
                     borderRadius: BorderRadius.circular(999)),
                 child: Text(badge['nivel'] ?? 'N/A',
-                    style: TextStyle(color: Colors.white, fontSize: 10)),
+                    style: const TextStyle(color: Colors.white, fontSize: 10)),
               ),
-              SizedBox(width: 6),
-              Icon(Icons.star, size: 12, color: Colors.amber),
-              SizedBox(width: 2),
+              const SizedBox(width: 6),
+              const Icon(Icons.star, size: 12, color: Colors.amber),
+              const SizedBox(width: 2),
               Text('${badge['pontos'] ?? 0} pts',
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontSize: 11, fontWeight: FontWeight.bold)),
             ],
           ),
 
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
 
-          Align(
+          const Align(
             alignment: Alignment.centerLeft,
             child: Text('REQUISITOS',
                 style: TextStyle(fontSize: 9, color: Colors.grey)),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Row(
             children: [
               _icon(Icons.emoji_events, Colors.orange),
-              SizedBox(width: 4),
+              const SizedBox(width: 4),
               _icon(Icons.star, Colors.red),
-              SizedBox(width: 4),
+              const SizedBox(width: 4),
               _icon(Icons.description, Colors.grey),
             ],
           ),
 
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Progresso',
-                  style: TextStyle(fontSize: 9, color: Colors.grey)),
-              Text('$atual/$total',
-                  style: TextStyle(fontSize: 9, color: Colors.grey)),
-            ],
-          ),
-          SizedBox(height: 4),
-          LinearProgressIndicator(
-            value: total > 0 ? (atual / total).clamp(0.0, 1.0) : 0,
-            backgroundColor: Color(0xFFE5E7EB),
-            color: Color(0xFF2563EB),
-            minHeight: 4,
-          ),
+          // Progress (compact)
+          BadgeProgress(atual: atual, total: total, compact: true),
         ],
       ),
     );
@@ -353,7 +471,7 @@ class _BadgeCard extends StatelessWidget {
       width: 28,
       height: 28,
       decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: Color.fromARGB((0.15 * 255).round(), (color.r * 255).round(), (color.g * 255).round(), (color.b * 255).round()),
           borderRadius: BorderRadius.circular(8)),
       child: Icon(icon, size: 15, color: color),
     );

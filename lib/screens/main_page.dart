@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import './help_page.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
+import '../base64_image_widget.dart';
+import '../widgets/badge_progress.dart';
 import './badges_page.dart';
 import './badge_detail_page.dart';
 import './profile_page.dart';
@@ -13,6 +15,8 @@ import './change_password.dart';
 import './candidaturas.dart';
 
 class MainPage extends StatefulWidget {
+  const MainPage({super.key});
+
   @override
   State<MainPage> createState() => _MainPageState();
 }
@@ -87,7 +91,7 @@ class _MainPageState extends State<MainPage> {
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => NotificationsPage(),
+                            builder: (_) => const NotificationsPage(),
                           ),
                         );
                         _loadData();
@@ -137,180 +141,214 @@ class _MainPageState extends State<MainPage> {
               future: _candidaturasFuture,
               builder: (context, candidaturaSnap) {
                 final candidaturas = candidaturaSnap.data ?? [];
-                
+
                 // Create a map of badge IDs to candidaturas for quick lookup
                 final candidaturasByBadgeId = <int, dynamic>{};
                 for (final c in candidaturas) {
-                  candidaturasByBadgeId[c['badge_id'] as int] = c;
+                  final badgeId = int.tryParse(c?['idbadge']?.toString() ?? '') ??
+                      (c?['id'] is int ? c['id'] as int : 0);
+                  if (badgeId > 0) candidaturasByBadgeId[badgeId] = c;
                 }
 
-                return ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
+                return SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
-                  children: [
-                    const Text(
-                  'Bom Dia!',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E3A5F),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black12, blurRadius: 8),
-                    ],
-                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Meta Definida',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black12, blurRadius: 8),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Meta Definida',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Conseguiste alcançar 5 badges nos últimos 4 meses!',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                            const Text(
+                              'Faltam 5 badges para alcançar a meta definida',
+                              style: TextStyle(color: Colors.grey, fontSize: 13),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Badges conquistados',
+                              style: TextStyle(color: Colors.grey, fontSize: 12),
+                            ),
+                            const SizedBox(height: 8),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: (listaBadges.isEmpty
+                                        ? List.filled(5, null)
+                                        : listaBadges)
+                                    .take(5)
+                                    .map<Widget>(
+                                      (b) => Padding(
+                                        padding:
+                                            const EdgeInsets.only(right: 8),
+                                        child: CircleAvatar(
+                                          radius: 22,
+                                          backgroundColor:
+                                              Colors.blue.shade100,
+                                          child: b != null && b['imagemurl'] != null
+                                              ? ClipOval(
+                                                  child: Base64ImageWidget(
+                                                    imageData: b['imagemurl'].toString()
+                                                        .replaceAll('localhost', '10.0.2.2')
+                                                        .replaceAll('127.0.0.1', '10.0.2.2')
+                                                        .replaceAll('100.105.58.22', '10.0.2.2')
+                                                        .replaceAll('0.0.0.0', '10.0.2.2'),
+                                                    width: 44,
+                                                    height: 44,
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                                )
+                                              : const Icon(
+                                                  Icons.emoji_events,
+                                                  size: 22,
+                                                  color: Colors.blue,
+                                                ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 6),
+
+                      const SizedBox(height: 24),
+
                       const Text(
-                        'Conseguiste alcançar 5 badges nos últimos 4 meses!',
-                        style: TextStyle(fontSize: 13),
+                        'Candidaturas Submetidas',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                      const Text(
-                        'Faltam 5 badges para alcançar a meta definida',
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                const SizedBox(height: 12),
+                      Row(
+                        children: (candidaturas.isEmpty
+                                ? List.filled(2, null)
+                                : candidaturas)
+                            .take(2)
+                            .map<Widget>(
+                              (c) => Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: _miniCard(
+                                    c,
+                                    showProgress: true,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => BadgeDetailPage(
+                                          badge: c,
+                                          candidatura: c,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Badges Recomendados',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const BadgesPage()),
+                            ),
+                            child: const Icon(
+                              Icons.arrow_forward,
+                              size: 18,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'Badges conquistados',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: (listaBadges.isEmpty
-                                  ? List.filled(5, null)
-                                  : listaBadges)
-                              .take(5)
-                              .map<Widget>(
-                                (b) => Padding(
+                      Row(
+                        children: (listaBadges.isEmpty
+                                ? List.filled(2, null)
+                                : listaBadges)
+                            .take(2)
+                            .map<Widget>((b) {
+                              if (b == null) {
+                                return const Expanded(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(right: 8),
+                                    child: SizedBox.shrink(),
+                                  ),
+                                );
+                              }
+
+                              final badgeId = int.tryParse(b['idbadge']?.toString() ?? '') ??
+                                  (b['id'] is int ? b['id'] as int : 0);
+
+                              final candidatura = candidaturasByBadgeId[badgeId];
+
+                              // If there's a candidatura for this badge, merge its progress
+                              // into the badge object so _miniCard can read progresso_atual/total.
+                              dynamic renderedBadge = b;
+                              if (candidatura != null) {
+                                try {
+                                  renderedBadge = Map<String, dynamic>.from(b as Map)
+                                    ..['progresso_atual'] = candidatura['progresso_atual']
+                                    ..['progresso_total'] = candidatura['progresso_total'];
+                                } catch (_) {
+                                  renderedBadge = b;
+                                }
+                              }
+
+                              return Expanded(
+                                child: Padding(
                                   padding: const EdgeInsets.only(right: 8),
-                                  child: CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: Colors.blue.shade100,
-                                    backgroundImage:
-                                        b != null && b['imagemurl'] != null
-                                            ? NetworkImage(b['imagemurl'])
-                                            : null,
-                                    child: b == null || b['imagemurl'] == null
-                                        ? const Icon(
-                                            Icons.emoji_events,
-                                            size: 22,
-                                            color: Colors.blue,
-                                          )
-                                        : null,
+                                  child: _miniCard(
+                                    renderedBadge,
+                                    showProgress: candidatura != null,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => BadgeDetailPage(
+                                          badge: b,
+                                          candidatura: candidatura,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              )
-                              .toList(),
-                        ),
+                              );
+                            }).toList(),
                       ),
+                      const SizedBox(height: 24),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 24),
-
-                const Text(
-                  'Candidaturas Submetidas',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: (candidaturas.isEmpty ? List.filled(2, null) : candidaturas)
-                      .take(2)
-                      .map<Widget>(
-                        (c) => Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: _miniCard(
-                              c,
-                              showProgress: true,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BadgeDetailPage(
-                                    badge: c,
-                                    candidatura: c,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-
-                const SizedBox(height: 24),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Badges Recomendados',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => BadgesPage()),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_forward,
-                        size: 18,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: (listaBadges.isEmpty ? List.filled(2, null) : listaBadges)
-                      .take(2)
-                      .map<Widget>(
-                        (b) => Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: _miniCard(
-                              b,
-                              showProgress: false,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BadgeDetailPage(
-                                    badge: b,
-                                    candidatura: candidaturasByBadgeId[b['idbadge'] as int],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: 24),
-              ],
-            );
+                );
               },
             );
           },
@@ -330,7 +368,7 @@ class _MainPageState extends State<MainPage> {
                 Navigator.pop(context);
                 final resultado = await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => ProfilePage()),
+                  MaterialPageRoute(builder: (_) => const ProfilePage()),
                 );
 
                 if (resultado == true || mounted) {
@@ -345,23 +383,39 @@ class _MainPageState extends State<MainPage> {
                       radius: 26,
                       backgroundColor: Colors.purple.shade100,
                       child: ClipOval(
-                        child: fotoUrl.isNotEmpty
-                            ? Image.network(
-                                fotoUrl,
+                        child: Session.utilizador['foto_base64'] != null &&
+                                Session.utilizador['foto_base64'].toString().isNotEmpty
+                            ? Base64ImageWidget(
+                                imageData:
+                                    Session.utilizador['foto_base64'].toString(),
                                 width: 52,
                                 height: 52,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.person,
-                                  color: Colors.purple,
-                                  size: 30,
-                                ),
                               )
-                            : const Icon(
-                                Icons.person,
-                                color: Colors.purple,
-                                size: 30,
-                              ),
+                            : (fotoUrl.isNotEmpty
+                                ? (Base64ImageWidget.isBase64(fotoUrl)
+                                    ? Base64ImageWidget(
+                                        imageData: fotoUrl,
+                                        width: 52,
+                                        height: 52,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Image.network(
+                                        fotoUrl,
+                                        width: 52,
+                                        height: 52,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const Icon(
+                                          Icons.person,
+                                          color: Colors.purple,
+                                          size: 30,
+                                        ),
+                                      ))
+                                : const Icon(
+                                    Icons.person,
+                                    color: Colors.purple,
+                                    size: 30,
+                                  )),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -400,7 +454,7 @@ class _MainPageState extends State<MainPage> {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => BadgesPage()),
+                  MaterialPageRoute(builder: (_) => const BadgesPage()),
                 );
               },
             ),
@@ -412,7 +466,7 @@ class _MainPageState extends State<MainPage> {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => RankingPage()),
+                  MaterialPageRoute(builder: (_) => const RankingPage()),
                 );
               },
             ),
@@ -424,7 +478,7 @@ class _MainPageState extends State<MainPage> {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => CandidaturasPage()),
+                  MaterialPageRoute(builder: (_) => const CandidaturasPage()),
                 );
               },
             ),
@@ -450,7 +504,7 @@ class _MainPageState extends State<MainPage> {
                 Session.terminar();
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (_) => LoginPage()),
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
                   (route) => false,
                 );
               },
@@ -463,7 +517,7 @@ class _MainPageState extends State<MainPage> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => AjudaPage()),
+                MaterialPageRoute(builder: (_) => const AjudaPage()),
               );
             }),
 
@@ -474,7 +528,7 @@ class _MainPageState extends State<MainPage> {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => ChangePasswordPage()),
+                  MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
                 );
               },
             ),
@@ -519,7 +573,7 @@ class _MainPageState extends State<MainPage> {
         int.tryParse(badge?['progresso_atual']?.toString() ?? '0') ?? 0;
     final int total =
         int.tryParse(badge?['progresso_total']?.toString() ?? '0') ?? 0;
-    final double pct = total > 0 ? (atual / total).clamp(0.0, 1.0) : 0.5;
+    // progress percentage not used here; remove unused local
 
     final card = Container(
       padding: const EdgeInsets.all(12),
@@ -534,17 +588,24 @@ class _MainPageState extends State<MainPage> {
         children: [
           badge == null || badge['imagemurl'] == null
               ? const Icon(Icons.emoji_events, size: 50, color: Colors.grey)
-              : Image.network(
-                  badge['imagemurl'],
-                  width: 50,
-                  height: 50,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.emoji_events,
-                    size: 50,
-                    color: Colors.grey,
-                  ),
-                ),
+              : (Base64ImageWidget.isBase64(badge['imagemurl'].toString())
+                  ? Base64ImageWidget(
+                      imageData: badge['imagemurl'].toString(),
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.contain,
+                    )
+                  : Image.network(
+                      badge['imagemurl'],
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.emoji_events,
+                        size: 50,
+                        color: Colors.grey,
+                      ),
+                    )),
           const SizedBox(height: 6),
           Text(
             badge?['nome'] ?? 'Badge',
@@ -557,34 +618,10 @@ class _MainPageState extends State<MainPage> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          if (showProgress) ...[
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Progresso',
-                  style: TextStyle(fontSize: 10, color: Colors.grey),
-                ),
-                Text(
-                  '${(pct * 100).toInt()}%',
-                  style: const TextStyle(fontSize: 10, color: Colors.grey),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            LinearProgressIndicator(
-              value: pct,
-              backgroundColor: const Color(0xFFE5E7EB),
-              color: const Color(0xFF2563EB),
-              minHeight: 4,
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              '10 dias restantes',
-              style: TextStyle(fontSize: 10, color: Colors.grey),
-            ),
-          ],
+          const SizedBox(height: 6),
+          // Always show a compact progress indicator (number of requirements completed)
+          BadgeProgress(atual: atual, total: total, compact: true),
+          const SizedBox(height: 6),
         ],
       ),
     );

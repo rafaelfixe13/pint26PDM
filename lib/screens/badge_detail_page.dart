@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../base64_image_widget.dart';
 import 'package:image_picker/image_picker.dart';
+import '../widgets/badge_progress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -14,7 +16,7 @@ class BadgeDetailPage extends StatefulWidget {
   final dynamic badge;
   final dynamic candidatura; // Optional candidatura data
   
-  const BadgeDetailPage({
+  const BadgeDetailPage({super.key, 
     required this.badge,
     this.candidatura,
   });
@@ -29,6 +31,23 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
   @override
   Widget build(BuildContext context) {
     final badge = widget.badge;
+
+    if (badge == null) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(
+          child: Text('Badge indisponível', style: TextStyle(color: Colors.grey)),
+        ),
+      );
+    }
+
     final int atual = int.tryParse(badge['progresso_atual']?.toString() ?? '0') ?? 0;
     final int total = int.tryParse(badge['progresso_total']?.toString() ?? '0') ?? 0;
 
@@ -41,18 +60,18 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           if (isApproved)
             IconButton(
-              icon: Icon(Icons.business, color: Color(0xFF0A66C2)),
+              icon: const Icon(Icons.business, color: Color(0xFF0A66C2)),
               onPressed: _shareBadgeImageLinkedIn,
               tooltip: 'Partilhar no LinkedIn',
             ),
           IconButton(
-            icon: Icon(Icons.share, color: Colors.black),
+            icon: const Icon(Icons.share, color: Colors.black),
             onPressed: _compartilharPDF,
             tooltip: 'Partilhar Certificado',
           ),
@@ -62,123 +81,118 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(20),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
 
-                  // Imagem grande
-                  badge['imagemurl'] != null
-                      ? Image.network(badge['imagemurl'], width: 160, height: 160,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) =>
-                              Icon(Icons.emoji_events, size: 160, color: Color(0xFF2563EB)))
-                      : Icon(Icons.emoji_events, size: 160, color: Color(0xFF2563EB)),
+                    // Imagem grande (suporta Base64 ou URL)
+                    badge['imagemurl'] != null
+                      ? Base64ImageWidget(
+                        imageData: badge['imagemurl']
+                          .toString()
+                          .replaceAll('localhost', '10.0.2.2')
+                          .replaceAll('127.0.0.1', '10.0.2.2')
+                          .replaceAll('100.105.58.22', '10.0.2.2')
+                          .replaceAll('0.0.0.0', '10.0.2.2'),
+                        width: 160,
+                        height: 160,
+                        fit: BoxFit.contain,
+                        errorWidget: const Icon(Icons.emoji_events, size: 160, color: Color(0xFF2563EB)),
+                      )
+                      : const Icon(Icons.emoji_events, size: 160, color: Color(0xFF2563EB)),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   // Nome
                   Text(badge['nome'] ?? '',
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF2563EB))),
 
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
 
                   // Descrição
                   Text(badge['descricao'] ?? '',
-                      style: TextStyle(color: Colors.grey),
+                      style: const TextStyle(color: Colors.grey),
                       textAlign: TextAlign.center),
 
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
                   // Nível + Pontos
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
                             color: Colors.black,
                             borderRadius: BorderRadius.circular(999)),
                         child: Text('Nível: ${badge['nivel'] ?? 'N/A'}',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       ),
-                      SizedBox(width: 12),
-                      Icon(Icons.star, color: Colors.amber),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 12),
+                      const Icon(Icons.star, color: Colors.amber),
+                      const SizedBox(width: 4),
                       Text('${badge['pontos'] ?? 0} pts',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ],
                   ),
 
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
                   // Link público
                   if (badge['linkpublicobase'] != null)
                     Text(badge['linkpublicobase'],
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        style: const TextStyle(fontSize: 12, color: Colors.grey)),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   // Requisitos
-                  Align(
+                  const Align(
                     alignment: Alignment.centerLeft,
                     child: Text('REQUISITOS',
                         style: TextStyle(color: Colors.grey, fontSize: 12)),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       _icon(Icons.emoji_events, Colors.orange),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       _icon(Icons.star, Colors.red),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       _icon(Icons.description, Colors.blueAccent, selected: true),
                     ],
                   ),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   // Progresso
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Progresso', style: TextStyle(color: Colors.grey)),
-                      Text('$atual/$total', style: TextStyle(color: Colors.grey)),
-                    ],
-                  ),
-                  SizedBox(height: 6),
-                  LinearProgressIndicator(
-                    value: total > 0 ? (atual / total).clamp(0.0, 1.0) : 0,
-                    backgroundColor: Color(0xFFE5E7EB),
-                    color: Color(0xFF2563EB),
-                    minHeight: 6,
-                  ),
+                  BadgeProgress(atual: atual, total: total),
 
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
                   // Tabs
                   Row(
                     children: [
                       _tabBtn('Descrição do Badge', 0),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       _tabBtn('Competências do Badge', 1),
                     ],
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Color(0xFFEFF6FF),
+                      color: const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       _tab == 0
                           ? (badge['descricao'] ?? 'Sem descrição.')
                           : (badge['competencias'] ?? 'Sem competências.'),
-                      style: TextStyle(fontSize: 13, height: 1.6),
+                      style: const TextStyle(fontSize: 13, height: 1.6),
                     ),
                   ),
                 ],
@@ -188,7 +202,7 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
 
           // Botão Candidatar-me ou Status da Candidatura
           Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: widget.candidatura != null
                 ? _buildCandidaturaStatus()
                 : _buildCandidatarButton(),
@@ -251,9 +265,11 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
       );
     } catch (e) {
       if (mounted) Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao partilhar no LinkedIn: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao partilhar no LinkedIn: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -263,16 +279,16 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
       children: [
         Container(
           width: double.infinity,
-          padding: EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Color(0xFFEFF6FF),
+            color: const Color(0xFFEFF6FF),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Color(0xFF2563EB), width: 2),
+            border: Border.all(color: const Color(0xFF2563EB), width: 2),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'Candidatura Submetida',
                 style: TextStyle(
                   fontSize: 14,
@@ -280,39 +296,39 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
                   color: Color(0xFF2563EB),
                 ),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 'Estado: ${candidatura['estado']}',
-                style: TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 12),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 'Progresso: ${candidatura['progresso_atual']}/${candidatura['progresso_total']}',
-                style: TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 12),
               ),
               if (candidatura['datasubmissao'] != null) ...[
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Submetido em: ${candidatura['datasubmissao'].toString().split('T').first}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
             ],
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
             onPressed: () => _mostrarDialogCandidatura(context),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFFFF9800),
+              backgroundColor: const Color(0xFFFF9800),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: Text(
+            child: const Text(
               'Atualizar Candidatura',
               style: TextStyle(fontSize: 16, color: Colors.white),
             ),
@@ -329,12 +345,12 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
       child: ElevatedButton(
         onPressed: () => _mostrarDialogCandidatura(context),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Color(0xFF2563EB),
+          backgroundColor: const Color(0xFF2563EB),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: Text(
+        child: const Text(
           'Candidatar-me',
           style: TextStyle(fontSize: 16, color: Colors.white),
         ),
@@ -358,7 +374,7 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
           future: ApiService.getRequisitosBadge(badgeId),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return AlertDialog(
+              return const AlertDialog(
                 title: Text('A carregar requisitos...'),
                 content: SizedBox(
                   height: 100,
@@ -369,12 +385,12 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
 
             if (snapshot.hasError) {
               return AlertDialog(
-                title: Text('Erro'),
+                title: const Text('Erro'),
                 content: Text('${snapshot.error}'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: Text('Fechar'),
+                    child: const Text('Fechar'),
                   ),
                 ],
               );
@@ -384,12 +400,12 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
 
             if (requisitos.isEmpty) {
               return AlertDialog(
-                title: Text('Sem Requisitos'),
-                content: Text('Este badge não tem requisitos.'),
+                title: const Text('Sem Requisitos'),
+                content: const Text('Este badge não tem requisitos.'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: Text('Fechar'),
+                    child: const Text('Fechar'),
                   ),
                 ],
               );
@@ -412,9 +428,9 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
     return GestureDetector(
       onTap: () => setState(() => _tab = index),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? Color(0xFF2563EB) : Colors.transparent,
+          color: active ? const Color(0xFF2563EB) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: active ? null : Border.all(color: Colors.grey.shade300),
         ),
@@ -431,65 +447,15 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
     return Container(
       width: 52, height: 52,
       decoration: BoxDecoration(
-        color: selected ? Color(0xFFEFF6FF) : color.withOpacity(0.15),
+        color: selected ? const Color(0xFFEFF6FF) : Color.fromARGB((0.15 * 255).round(), (color.r * 255).round(), (color.g * 255).round(), (color.b * 255).round()),
         borderRadius: BorderRadius.circular(12),
-        border: selected ? Border.all(color: Color(0xFF2563EB), width: 2) : null,
+        border: selected ? Border.all(color: const Color(0xFF2563EB), width: 2) : null,
       ),
-      child: Icon(icon, size: 26, color: selected ? Color(0xFF2563EB) : color),
-    );
-  }
-
-  Future<void> _abrirLinkedIn() async {
-    try {
-      // Try platform-specific LinkedIn deep links
-      final linkedinSchemes = [
-        // Android LinkedIn app
-        'com.linkedin.android://home',
-        // iOS LinkedIn app
-        'linkedin://app',
-        // Web fallback
-        'https://www.linkedin.com',
-      ];
-
-      bool opened = false;
-
-      for (String scheme in linkedinSchemes) {
-        try {
-          final uri = Uri.parse(scheme);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(
-              uri,
-              mode: LaunchMode.externalApplication,
-            );
-            opened = true;
-            break;
-          }
-        } catch (e) {
-          debugPrint('LinkedIn scheme failed: $scheme');
-          continue;
-        }
-      }
-
-      if (!opened) {
-        // Last resort - try web
-        await launchUrl(
-          Uri.parse('https://www.linkedin.com'),
-          mode: LaunchMode.externalApplication,
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao abrir LinkedIn: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      child: Icon(icon, size: 26, color: selected ? const Color(0xFF2563EB) : color),
+      );
     }
-  }
 
-  Future<void> _compartilharPDF() async {
+    Future<void> _compartilharPDF() async {
     try {
       // Check if badge has certificate in Base64
       final certificadoBase64 = widget.badge['certificado'];
@@ -499,7 +465,7 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
 
       // Show loading
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('A preparar certificado...')),
+        const SnackBar(content: Text('A preparar certificado...')),
       );
 
       // Decode Base64 to bytes
@@ -592,7 +558,8 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
     final isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension);
     final isPdf = extension == 'pdf';
 
-    if (isImage) {
+    // Treat data URIs / base64 as images as well
+    if (isImage || Base64ImageWidget.isBase64(fileUrl)) {
       _showImageViewer(fileUrl);
     } else if (isPdf) {
       _downloadAndOpenPdf(fileUrl);
@@ -601,9 +568,11 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
       try {
         await launchUrl(Uri.parse(fileUrl));
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Não foi possível abrir o ficheiro')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Não foi possível abrir o ficheiro')),
+          );
+        }
       }
     }
   }
@@ -618,66 +587,73 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
             AppBar(
               backgroundColor: Colors.black87,
               leading: IconButton(
-                icon: Icon(Icons.close, color: Colors.white),
+                icon: const Icon(Icons.close, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
-              title: Text('Ver Imagem', style: TextStyle(color: Colors.white)),
+              title: const Text('Ver Imagem', style: TextStyle(color: Colors.white)),
             ),
             Expanded(
               child: Container(
                 color: Colors.black87,
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                  headers: const {
-                    'Accept': 'image/*',
-                  },
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            value: progress.expectedTotalBytes != null
-                                ? progress.cumulativeBytesLoaded /
-                                    progress.expectedTotalBytes!
-                                : null,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'A carregar...',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.error_outline, color: Colors.red, size: 48),
-                          SizedBox(height: 16),
-                          Text(
-                            'Erro ao carregar imagem',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            error.toString(),
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
+                child: Base64ImageWidget.isBase64(imageUrl)
+                    ? Base64ImageWidget(
+                        imageData: imageUrl,
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                        height: double.infinity,
+                      )
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        headers: const {
+                          'Accept': 'image/*',
+                        },
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  value: progress.expectedTotalBytes != null
+                                      ? progress.cumulativeBytesLoaded /
+                                          progress.expectedTotalBytes!
+                                      : null,
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'A carregar...',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ],
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Erro ao carregar imagem',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  error.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
             ),
           ],
@@ -689,7 +665,7 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
   Future<void> _downloadAndOpenPdf(String pdfUrl) async {
     try {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('A descarregar PDF...')),
+        const SnackBar(content: Text('A descarregar PDF...')),
       );
 
       final response = await http.get(Uri.parse(pdfUrl));
@@ -706,14 +682,14 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
         if (result.type != ResultType.done) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Não foi possível abrir o PDF')),
+              const SnackBar(content: Text('Não foi possível abrir o PDF')),
             );
           }
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao descarregar ficheiro')),
+            const SnackBar(content: Text('Erro ao descarregar ficheiro')),
           );
         }
       }
@@ -731,37 +707,35 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
     
     showModalBottomSheet(
       context: context,
-      builder: (BuildContext context) => Container(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: Icon(Icons.photo_library),
-              title: Text('Selecionar da Galeria'),
-              onTap: () async {
-                Navigator.pop(context);
-                final image = await picker.pickImage(source: ImageSource.gallery);
-                if (image != null) {
-                  setState(() {
-                    selectedFiles[requisitoId] = image.path;
-                  });
-                }
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.camera_alt),
-              title: Text('Tirar Foto'),
-              onTap: () async {
-                Navigator.pop(context);
-                final image = await picker.pickImage(source: ImageSource.camera);
-                if (image != null) {
-                  setState(() {
-                    selectedFiles[requisitoId] = image.path;
-                  });
-                }
-              },
-            ),
-          ],
-        ),
+      builder: (BuildContext context) => Wrap(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_library),
+            title: const Text('Selecionar da Galeria'),
+            onTap: () async {
+              Navigator.pop(context);
+              final image = await picker.pickImage(source: ImageSource.gallery);
+              if (image != null) {
+                setState(() {
+                  selectedFiles[requisitoId] = image.path;
+                });
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.camera_alt),
+            title: const Text('Tirar Foto'),
+            onTap: () async {
+              Navigator.pop(context);
+              final image = await picker.pickImage(source: ImageSource.camera);
+              if (image != null) {
+                setState(() {
+                  selectedFiles[requisitoId] = image.path;
+                });
+              }
+            },
+          ),
+        ],
       ),
     );
   }
@@ -769,7 +743,7 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
   Future<void> _submitCandidatura() async {
     if (selectedFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Seleciona pelo menos um ficheiro.')),
+        const SnackBar(content: Text('Seleciona pelo menos um ficheiro.')),
       );
       return;
     }
@@ -784,7 +758,7 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Candidatura submetida com sucesso!')),
+          const SnackBar(content: Text('Candidatura submetida com sucesso!')),
         );
         widget.onClose();
       }
@@ -807,13 +781,13 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
+            const Text(
               'Seleciona ficheiros de evidência para os requisitos:',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             if (isLoadingSubmitted)
-              Center(child: CircularProgressIndicator())
+              const Center(child: CircularProgressIndicator())
             else
               ...widget.requisitos.map((req) {
                 final reqId = req['idrequisito'] as int;
@@ -823,17 +797,17 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
                 final hasSubmitted = submitted != null;
 
                 return Padding(
-                  padding: EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(reqNome, style: TextStyle(fontWeight: FontWeight.w600)),
+                          Text(reqNome, style: const TextStyle(fontWeight: FontWeight.w600)),
                           if (hasSubmitted)
                             Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.green.shade100,
                                 borderRadius: BorderRadius.circular(8),
@@ -841,8 +815,8 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.check, color: Colors.green, size: 14),
-                                  SizedBox(width: 4),
+                                  const Icon(Icons.check, color: Colors.green, size: 14),
+                                  const SizedBox(width: 4),
                                   Text(
                                     'Submetido',
                                     style: TextStyle(
@@ -856,12 +830,12 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
                             ),
                         ],
                       ),
-                      SizedBox(height: 6),
+                      const SizedBox(height: 6),
                       if (hasSubmitted)
                         Container(
                           width: double.infinity,
-                          padding: EdgeInsets.all(10),
-                          margin: EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(10),
+                          margin: const EdgeInsets.only(bottom: 8),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.green.shade300),
                             borderRadius: BorderRadius.circular(8),
@@ -877,7 +851,7 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
                                   color: Colors.grey.shade700,
                                 ),
                               ),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 4),
                               GestureDetector(
                                 onTap: () {
                                   final url = submitted['evidencia_url']?.toString();
@@ -904,22 +878,22 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
                         onTap: () => _pickFile(reqId),
                         child: Container(
                           width: double.infinity,
-                          padding: EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             border: Border.all(
-                              color: hasNewFile ? Color(0xFF2563EB) : Colors.grey.shade300,
+                              color: hasNewFile ? const Color(0xFF2563EB) : Colors.grey.shade300,
                               width: 2,
                             ),
                             borderRadius: BorderRadius.circular(8),
-                            color: hasNewFile ? Color(0xFFEFF6FF) : Colors.transparent,
+                            color: hasNewFile ? const Color(0xFFEFF6FF) : Colors.transparent,
                           ),
                           child: Row(
                             children: [
                               Icon(
                                 hasNewFile ? Icons.check_circle : Icons.upload_file,
-                                color: hasNewFile ? Color(0xFF2563EB) : Colors.grey,
+                                color: hasNewFile ? const Color(0xFF2563EB) : Colors.grey,
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   hasNewFile
@@ -939,22 +913,22 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
           ],
         ),
       ),
       actions: [
         TextButton(
           onPressed: widget.onClose,
-          child: Text('Cancelar'),
+          child: const Text('Cancelar'),
         ),
         ElevatedButton(
           onPressed: isSubmitting ? null : _submitCandidatura,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF2563EB),
+            backgroundColor: const Color(0xFF2563EB),
           ),
           child: isSubmitting
-              ? SizedBox(
+              ? const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
@@ -962,7 +936,7 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 )
-              : Text('Submeter', style: TextStyle(color: Colors.white)),
+              : const Text('Submeter', style: TextStyle(color: Colors.white)),
         ),
       ],
     );

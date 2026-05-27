@@ -3,6 +3,8 @@ import '../services/api_service.dart';
 import 'login_page.dart';
 
 class SignUpPage extends StatefulWidget {
+  const SignUpPage({super.key});
+
   @override
   State<SignUpPage> createState() => _SignUpPageState();
 }
@@ -65,14 +67,14 @@ class _SignUpPageState extends State<SignUpPage> {
       // registo bem sucedido — vai para o login
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Conta criada com sucesso! Faz login.'),
             backgroundColor: Colors.green,
           ),
         );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => LoginPage()),
+          MaterialPageRoute(builder: (_) => const LoginPage()),
         );
       }
     } catch (e) {
@@ -90,17 +92,17 @@ class _SignUpPageState extends State<SignUpPage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Logo SOFTINSA
               Center(
                 child: RichText(
-                  text: TextSpan(
+                  text: const TextSpan(
                     style: TextStyle(
                       fontSize: 36,
                       fontWeight: FontWeight.bold,
@@ -124,9 +126,9 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
               ),
 
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-              Center(
+              const Center(
                 child: Text(
                   'REGISTO',
                   style: TextStyle(
@@ -138,24 +140,24 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
               ),
 
-              SizedBox(height: 32),
+              const SizedBox(height: 32),
 
               // Nome
-              Text('Nome completo',
+              const Text('Nome completo',
                   style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               _campo(
                 controller: _nomeController,
                 hint: 'Ex: João Silva',
                 icon: Icons.person_outline,
               ),
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // Email
-              Text('Email',
+              const Text('Email',
                   style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               _campo(
                 controller: _emailController,
                 hint: 'xxx@softinsa.pt',
@@ -163,12 +165,12 @@ class _SignUpPageState extends State<SignUpPage> {
                 tipo: TextInputType.emailAddress,
               ),
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // Password
-              Text('Password',
+              const Text('Password',
                   style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               _campoPassword(
                 controller: _passwordController,
                 hint: 'Mínimo 6 caracteres',
@@ -176,12 +178,12 @@ class _SignUpPageState extends State<SignUpPage> {
                 onToggle: () => setState(() => _verPassword = !_verPassword),
               ),
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // Confirmar Password
-              Text('Confirmar Password',
+              const Text('Confirmar Password',
                   style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               _campoPassword(
                 controller: _confirmarPasswordController,
                 hint: 'Repete a password',
@@ -189,27 +191,27 @@ class _SignUpPageState extends State<SignUpPage> {
                 onToggle: () => setState(() => _verConfirmar = !_verConfirmar),
               ),
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // Erro
               if (_erro != null)
                 Padding(
-                  padding: EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, color: Colors.red, size: 16),
-                      SizedBox(width: 6),
+                      const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           _erro!,
-                          style: TextStyle(color: Colors.red, fontSize: 13),
+                          style: const TextStyle(color: Colors.red, fontSize: 13),
                         ),
                       ),
                     ],
                   ),
                 ),
 
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
 
               // Botão Registar
               SizedBox(
@@ -218,18 +220,18 @@ class _SignUpPageState extends State<SignUpPage> {
                 child: ElevatedButton(
                   onPressed: _loading ? null : _registar,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF2B4E8C),
+                    backgroundColor: const Color(0xFF2B4E8C),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _loading
-                      ? SizedBox(
+                      ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2),
                         )
-                      : Text(
+                      : const Text(
                           'Criar Conta',
                           style: TextStyle(
                               fontSize: 16,
@@ -239,22 +241,22 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
               ),
 
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
 
               // Já tem conta
               Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Já tens conta? ',
+                    const Text('Já tens conta? ',
                         style:
                             TextStyle(fontSize: 13, color: Colors.black87)),
                     GestureDetector(
                       onTap: () => Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (_) => LoginPage()),
+                        MaterialPageRoute(builder: (_) => const LoginPage()),
                       ),
-                      child: Text(
+                      child: const Text(
                         'Inicia sessão.',
                         style: TextStyle(
                           fontSize: 13,
@@ -284,19 +286,19 @@ class _SignUpPageState extends State<SignUpPage> {
       keyboardType: tipo,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey),
+        hintStyle: const TextStyle(color: Colors.grey),
         prefixIcon: Icon(icon, color: Colors.grey),
         filled: true,
-        fillColor: Color(0xFFF1F5F9),
+        fillColor: const Color(0xFFF1F5F9),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Color(0xFF2563EB), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
         ),
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }
@@ -312,19 +314,19 @@ class _SignUpPageState extends State<SignUpPage> {
       obscureText: !ver,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey),
-        prefixIcon: Icon(Icons.lock_outline, color: Colors.grey),
+        hintStyle: const TextStyle(color: Colors.grey),
+        prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
         filled: true,
-        fillColor: Color(0xFFF1F5F9),
+        fillColor: const Color(0xFFF1F5F9),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Color(0xFF2563EB), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
         ),
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         suffixIcon: IconButton(
           icon: Icon(
             ver ? Icons.visibility_off_outlined : Icons.visibility_outlined,

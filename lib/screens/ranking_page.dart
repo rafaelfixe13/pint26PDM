@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import '../base64_image_widget.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
 
 class RankingPage extends StatefulWidget {
+  const RankingPage({super.key});
+
   @override
   State<RankingPage> createState() => _RankingPageState();
 }
@@ -20,15 +23,15 @@ class _RankingPageState extends State<RankingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFD6EAF8),
+      backgroundColor: const Color(0xFFD6EAF8),
       appBar: AppBar(
-        backgroundColor: Color(0xFFD6EAF8),
+        backgroundColor: const Color(0xFFD6EAF8),
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
+        title: const Text(
           'Ranking',
           style: TextStyle(
             fontFamily: 'serif',
@@ -43,19 +46,19 @@ class _RankingPageState extends State<RankingPage> {
         future: _rankingFuture,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
-            return Center(child: Text('Erro ao carregar ranking'));
+            return const Center(child: Text('Erro ao carregar ranking'));
           }
 
           final lista = snap.data ?? [];
           if (lista.isEmpty) {
-            return Center(child: Text('Sem utilizadores no ranking'));
+            return const Center(child: Text('Sem utilizadores no ranking'));
           }
 
           // top 3
-          final top1 = lista.length > 0 ? lista[0] : null;
+          final top1 = lista.isNotEmpty ? lista[0] : null;
           final top2 = lista.length > 1 ? lista[1] : null;
           final top3 = lista.length > 2 ? lista[2] : null;
 
@@ -64,11 +67,11 @@ class _RankingPageState extends State<RankingPage> {
 
           return Column(
             children: [
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // ── TOP 3 ─────────────────────────────────────
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -85,7 +88,7 @@ class _RankingPageState extends State<RankingPage> {
                         ),
                       ),
 
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
 
                     // 1º lugar (maior)
                     if (top1 != null)
@@ -100,7 +103,7 @@ class _RankingPageState extends State<RankingPage> {
                         ),
                       ),
 
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
 
                     // 3º lugar
                     if (top3 != null)
@@ -117,21 +120,21 @@ class _RankingPageState extends State<RankingPage> {
                 ),
               ),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // ── LISTA (4º em diante) ──────────────────────
               Expanded(
                 child: Container(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: Colors.white,
                     borderRadius:
                         BorderRadius.vertical(top: Radius.circular(24)),
                   ),
                   child: ListView.separated(
                     padding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: resto.length,
-                    separatorBuilder: (_, __) => Divider(height: 1),
+                    separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (context, i) {
                       final u = resto[i];
                       final posicao = i + 4;
@@ -139,12 +142,12 @@ class _RankingPageState extends State<RankingPage> {
                           Session.id.toString();
 
                       return Container(
-                        margin: EdgeInsets.symmetric(vertical: 4),
-                        padding: EdgeInsets.symmetric(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
                           color: isYou
-                              ? Color(0xFF2563EB)
+                              ? const Color(0xFF2563EB)
                               : Colors.white,
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -156,7 +159,7 @@ class _RankingPageState extends State<RankingPage> {
                               nome: u['nome'],
                               radius: 24,
                             ),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             // Nome
                             Expanded(
                               child: Text(
@@ -173,21 +176,21 @@ class _RankingPageState extends State<RankingPage> {
                             Container(
                               width: 28,
                               height: 28,
-                              decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                 color: Color(0xFF1E3A5F),
                                 shape: BoxShape.circle,
                               ),
                               child: Center(
                                 child: Text(
                                   '$posicao',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             // Pontos
                             Text(
                               '${u['pontos'] ?? 0}',
@@ -232,9 +235,9 @@ class _TopCard extends StatelessWidget {
   });
 
   Color get _borderColor {
-    if (posicao == 1) return Color(0xFFFFD700); // ouro
-    if (posicao == 2) return Color(0xFF4A90D9); // azul
-    return Color(0xFF2E7D32); // verde
+    if (posicao == 1) return const Color(0xFFFFD700); // ouro
+    if (posicao == 2) return const Color(0xFF4A90D9); // azul
+    return const Color(0xFF2E7D32); // verde
   }
 
   @override
@@ -243,7 +246,7 @@ class _TopCard extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         if (showCrown)
-          Text('👑', style: TextStyle(fontSize: 28)),
+          const Text('👑', style: TextStyle(fontSize: 28)),
 
         Stack(
           alignment: Alignment.center,
@@ -275,7 +278,7 @@ class _TopCard extends StatelessWidget {
                 child: Center(
                   child: Text(
                     '$posicao',
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: Colors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.bold),
@@ -286,11 +289,11 @@ class _TopCard extends StatelessWidget {
           ],
         ),
 
-        SizedBox(height: 6),
+        const SizedBox(height: 6),
 
         Text(
           isCurrentUser ? 'You' : (utilizador['nome'] ?? ''),
-          style: TextStyle(
+          style: const TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 13,
             color: Color(0xFF1E3A5F),
@@ -333,18 +336,25 @@ class _Avatar extends StatelessWidget {
     return CircleAvatar(
       radius: radius,
       backgroundColor: Colors.purple.shade100,
-      child: ClipOval(
-        child: url.isNotEmpty
-            ? CachedNetworkImage(
-                imageUrl: url,
-                width: radius * 2,
-                height: radius * 2,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) =>
-                    Icon(Icons.person, size: radius, color: Colors.purple),
-              )
-            : Icon(Icons.person, size: radius, color: Colors.purple),
-      ),
+        child: ClipOval(
+          child: url.isNotEmpty
+              ? (Base64ImageWidget.isBase64(url)
+                  ? Base64ImageWidget(
+                      imageData: url,
+                      width: radius * 2,
+                      height: radius * 2,
+                      fit: BoxFit.cover,
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: url,
+                      width: radius * 2,
+                      height: radius * 2,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) =>
+                          Icon(Icons.person, size: radius, color: Colors.purple),
+                    ))
+              : Icon(Icons.person, size: radius, color: Colors.purple),
+        ),
     );
   }
 }

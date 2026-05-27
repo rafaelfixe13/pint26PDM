@@ -123,77 +123,7 @@ async function calcularProgressoBadge(client, userId, badgeId, idCandidatura) {
 // ─────────────────────────────────────────────────────────
 // ÁREAS
 // ─────────────────────────────────────────────────────────
-
-app.get("/areas", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT idarea, nome, descricao FROM areas WHERE ativo = TRUE ORDER BY nome ASC");
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Erro ao buscar áreas:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/debug/areas", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM areas");
-    res.json({ 
-      total: result.rows.length,
-      areas: result.rows 
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/niveis", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT idnivel, nome, descricao FROM nivel ORDER BY idnivel ASC");
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Erro ao carregar níveis:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─────────────────────────────────────────────────────────
-// SERVICELINE
-// ─────────────────────────────────────────────────────────
-app.get("/serviceline", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT idserviceline, nome, descricao FROM serviceline WHERE ativo = TRUE ORDER BY nome ASC");
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Erro ao buscar serviceline:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/debug/serviceline", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM serviceline");
-    res.json({ 
-      total: result.rows.length,
-      serviceline: result.rows 
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─────────────────────────────────────────────────────────
-// ÁREAS
-// ─────────────────────────────────────────────────────────────
-
-app.get("/areas", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT idarea, nome, descricao FROM areas WHERE ativo = TRUE ORDER BY nome ASC");
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Erro ao buscar áreas:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
+// (Duplicate route blocks removed; first occurrences retained above.)
 
 app.get("/debug/areas", async (req, res) => {
   try {
@@ -607,7 +537,7 @@ app.get("/utilizadores", async (req, res) => {
 
 // ─────────────────────────────────────────────────────────
 // GET: RANKING (ANTES de :id para evitar conflito)
-// ─────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────                          
 app.get("/utilizadores/ranking", async (req, res) => {
   try {
     const result = await pool.query(`

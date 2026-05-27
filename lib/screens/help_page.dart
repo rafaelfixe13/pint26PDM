@@ -270,11 +270,11 @@ class _AjudaTile extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE0E0E0)),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Color.fromRGBO(0, 0, 0, 0.04),
             blurRadius: 4,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -423,7 +423,7 @@ class _AjudaTile extends StatelessWidget {
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: primaryBlue.withOpacity(0.55),
+                        color: Color.fromARGB((0.55 * 255).round(), (primaryBlue.r * 255).round(), (primaryBlue.g * 255).round(), (primaryBlue.b * 255).round()),
                         shape: BoxShape.circle,
                       ),
                     ),

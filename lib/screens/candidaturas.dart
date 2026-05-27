@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../base64_image_widget.dart';
 import '../services/api_service.dart';
 import './badge_detail_page.dart';
 
@@ -82,7 +83,7 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: cor.withOpacity(0.12),
+        color: Color.fromARGB((0.12 * 255).round(), (cor.r * 255).round(), (cor.g * 255).round(), (cor.b * 255).round()),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -102,25 +103,32 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
     if (imagemUrl != null && imagemUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          imagemUrl,
-          width: 56,
-          height: 56,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.emoji_events,
-              color: Color(0xFF2563EB),
-              size: 28,
-            ),
-          ),
-        ),
+        child: Base64ImageWidget.isBase64(imagemUrl)
+            ? Base64ImageWidget(
+                imageData: imagemUrl,
+                width: 56,
+                height: 56,
+                fit: BoxFit.cover,
+              )
+            : Image.network(
+                imagemUrl,
+                width: 56,
+                height: 56,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.emoji_events,
+                    color: Color(0xFF2563EB),
+                    size: 28,
+                  ),
+                ),
+              ),
       );
     }
 

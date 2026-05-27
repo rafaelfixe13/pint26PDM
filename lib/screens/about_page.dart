@@ -40,15 +40,15 @@ class AboutPage extends StatelessWidget {
               Divider(color: Colors.grey.shade300, thickness: 1), //separador
               const SizedBox(height: 16), //separador
 
-              Row(
+              const Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.workspace_premium,
                     color: Color.fromARGB(255, 37, 99, 235),
                     size: 28,
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
+                  SizedBox(width: 8),
+                  Text(
                     //titulo do coiso
                     'Sistema de badges',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -68,15 +68,15 @@ class AboutPage extends StatelessWidget {
               Divider(color: Colors.grey.shade300, thickness: 1), //separador
               const SizedBox(height: 16), //separador
 
-              Row(
+              const Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.people,
                     color: Color.fromARGB(255, 37, 99, 235),
                     size: 28,
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
+                  SizedBox(width: 8),
+                  Text(
                     //titulo do coiso
                     'Perfis',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -128,15 +128,15 @@ class AboutPage extends StatelessWidget {
               Divider(color: Colors.grey.shade300, thickness: 1), //separador
               const SizedBox(height: 16), //separador
 
-              Row(
+              const Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.route,
                     color: Color.fromARGB(255, 37, 99, 235),
                     size: 28,
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
+                  SizedBox(width: 8),
+                  Text(
                     'Como Funciona',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),

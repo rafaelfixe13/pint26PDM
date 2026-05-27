@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/session.dart';
 import '../services/api_service.dart';
+import '../base64_image_widget.dart';
+import '../widgets/badge_progress.dart';
 import './edit_photo_page.dart';
 
 class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
@@ -23,14 +27,39 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _carregarBadges() async {
     try {
+      // Try to refresh user data (pontos, foto_base64) from the API
+      try {
+        await ApiService.recarregarDadosUtilizador();
+      } catch (e) {
+        debugPrint('Aviso: Não conseguiu recarregar dados do utilizador: $e');
+      }
+
       final badges = await ApiService.getBadgesDoUtilizador();
+      // Filter only approved / awarded badges. Server responses vary, so
+      // accept several indicators: top-level 'estado' == 'APPROVED', a
+      // nested 'candidatura' with 'estado' == 'APPROVED', or a
+      // non-empty 'data_conquista'. This prevents unapproved items from
+      // appearing in the "Badges Conquistados" list.
+      final approved = badges.where((b) {
+        try {
+          final estado = b['estado']?.toString().toUpperCase();
+          if (estado == 'APPROVED') return true;
+
+          final cand = b['candidatura'];
+          if (cand is Map && cand['estado']?.toString().toUpperCase() == 'APPROVED') return true;
+
+          final data = b['data_conquista'];
+          if (data != null && data.toString().trim().isNotEmpty) return true;
+        } catch (_) {}
+        return false;
+      }).toList();
       debugPrint('Badges recebidos: $badges');
       debugPrint('Utilizador sessão: ${Session.utilizador}');
       debugPrint('Pontos sessão: ${Session.pontos}');
 
       if (!mounted) return;
       setState(() {
-        _badgesConquistados = badges;
+        _badgesConquistados = approved;
         _loadingBadges = false;
       });
     } catch (e) {
@@ -66,15 +95,15 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: RefreshIndicator(
         onRefresh: _carregarBadges,
         child: SingleChildScrollView(
-          physics: AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -87,31 +116,46 @@ class _ProfilePageState extends State<ProfilePage> {
                           key: _avatarKey,
                           radius: 50,
                           backgroundColor: Colors.purple.shade100,
-                          child: ClipOval(
-                            child: fotoUrl.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: fotoUrl,
-                                    width: 100,
-                                    height: 100,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Center(
-                                      child: CircularProgressIndicator(
-                                        color: Colors.purple,
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                    errorWidget: (context, url, error) => Icon(
-                                      Icons.person,
-                                      size: 50,
-                                      color: Colors.purple,
-                                    ),
-                                  )
-                                : Icon(
-                                    Icons.person,
-                                    size: 50,
-                                    color: Colors.purple,
-                                  ),
-                          ),
+                            child: ClipOval(
+                              child: Session.utilizador['foto_base64'] != null &&
+                                      Session.utilizador['foto_base64'].toString().isNotEmpty
+                                  ? Base64ImageWidget(
+                                      imageData: Session.utilizador['foto_base64'].toString(),
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : (fotoUrl.isNotEmpty
+                                      ? (Base64ImageWidget.isBase64(fotoUrl)
+                                          ? Base64ImageWidget(
+                                              imageData: fotoUrl,
+                                              width: 100,
+                                              height: 100,
+                                              fit: BoxFit.cover,
+                                            )
+                                          : CachedNetworkImage(
+                                              imageUrl: fotoUrl,
+                                              width: 100,
+                                              height: 100,
+                                              fit: BoxFit.cover,
+                                              placeholder: (context, url) => const Center(
+                                                child: CircularProgressIndicator(
+                                                  color: Colors.purple,
+                                                  strokeWidth: 2,
+                                                ),
+                                              ),
+                                              errorWidget: (context, url, error) => const Icon(
+                                                Icons.person,
+                                                size: 50,
+                                                color: Colors.purple,
+                                              ),
+                                            ))
+                                      : const Icon(
+                                          Icons.person,
+                                          size: 50,
+                                          color: Colors.purple,
+                                        )),
+                            ),
                         ),
                         Positioned(
                           bottom: 2,
@@ -121,7 +165,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               final atualizado = await Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => EditPhotoPage(),
+                                  builder: (_) => const EditPhotoPage(),
                                 ),
                               );
 
@@ -135,14 +179,14 @@ class _ProfilePageState extends State<ProfilePage> {
                               width: 32,
                               height: 32,
                               decoration: BoxDecoration(
-                                color: Color(0xFF2563EB),
+                                color: const Color(0xFF2563EB),
                                 shape: BoxShape.circle,
                                 border: Border.all(
                                   color: Colors.white,
                                   width: 2,
                                 ),
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.edit,
                                 color: Colors.white,
                                 size: 16,
@@ -152,17 +196,17 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Text(
                       Session.nome,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF2563EB),
                       ),
                     ),
-                    SizedBox(height: 4),
-                    Text(
+                    const SizedBox(height: 4),
+                    const Text(
                       'Talent Management',
                       style: TextStyle(color: Colors.grey),
                     ),
@@ -170,61 +214,61 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-              Text(
+              const Text(
                 'Informações Pessoais',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
 
               _infoCard(
                 icon: Icons.email_outlined,
                 title: 'Email',
                 value: Session.email,
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               _infoCard(
                 icon: Icons.work_outline,
                 title: 'Área',
                 value: user['area_nome']?.toString() ?? '—',
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               _infoCard(
                 icon: Icons.badge_outlined,
                 title: 'Estado da Conta',
                 value: user['estadoconta']?.toString() ?? '—',
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               _infoCard(
                 icon: Icons.stars_rounded,
                 title: 'Pontos',
                 value: '$pontos pontos',
               ),
 
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-              Text(
+              const Text(
                 'Badges Conquistados',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 _loadingBadges
                     ? 'A carregar badges...'
                     : '$totalBadges badges conquistados',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
 
               if (_loadingBadges)
-                Center(
+                const Center(
                   child: Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
                     child: CircularProgressIndicator(
@@ -235,11 +279,11 @@ class _ProfilePageState extends State<ProfilePage> {
               else if (_badgesConquistados.isEmpty)
                 Container(
                   width: double.infinity,
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(color: Colors.black12, blurRadius: 6),
                     ],
                   ),
@@ -255,14 +299,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 ListView.separated(
                   itemCount: _badgesConquistados.length,
                   shrinkWrap: true,
-                  physics: NeverScrollableScrollPhysics(),
-                  separatorBuilder: (_, __) => SizedBox(height: 12),
+                  physics: const NeverScrollableScrollPhysics(),
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final badge = _badgesConquistados[index];
                     final imagem = badge['imagem']?.toString() ?? '';
                     final nome = badge['nome']?.toString() ?? 'Badge';
-                    final descricao =
-                        badge['descricao']?.toString() ?? 'Sem descrição';
+                    // descricao is not displayed in the list item; remove unused local
                     final progressoAtual =
                         int.tryParse('${badge['progresso_atual'] ?? 0}') ?? 0;
                     final progressoTotal =
@@ -271,11 +314,11 @@ class _ProfilePageState extends State<ProfilePage> {
                         _formatarData(badge['data_conquista']);
 
                     return Container(
-                      padding: EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
+                        boxShadow: const [
                           BoxShadow(
                             color: Colors.black12,
                             blurRadius: 6,
@@ -289,50 +332,56 @@ class _ProfilePageState extends State<ProfilePage> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(14),
                             child: imagem.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: imagem
-                                        .replaceAll('localhost', '10.0.2.2')
-                                        .replaceAll('127.0.0.1', '10.0.2.2')
-                                        .replaceAll('100.105.58.22', '10.0.2.2')
-                                        .replaceAll('0.0.0.0', '10.0.2.2'),
-                                    width: 78,
-                                    height: 78,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(
-                                      width: 78,
-                                      height: 78,
-                                      color: Colors.grey.shade200,
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Color(0xFF2563EB),
+                                ? (Base64ImageWidget.isBase64(imagem)
+                                    ? Base64ImageWidget(
+                                        imageData: imagem,
+                                        width: 78,
+                                        height: 78,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : CachedNetworkImage(
+                                        imageUrl: imagem
+                                            .replaceAll('localhost', '10.0.2.2')
+                                            .replaceAll('127.0.0.1', '10.0.2.2')
+                                            .replaceAll('100.105.58.22', '10.0.2.2')
+                                            .replaceAll('0.0.0.0', '10.0.2.2'),
+                                        width: 78,
+                                        height: 78,
+                                        fit: BoxFit.cover,
+                                        placeholder: (context, url) => Container(
+                                          width: 78,
+                                          height: 78,
+                                          color: Colors.grey.shade200,
+                                          child: const Center(
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Color(0xFF2563EB),
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                    errorWidget: (context, url, error) =>
-                                        Container(
-                                      width: 78,
-                                      height: 78,
-                                      color: Colors.blue.shade50,
-                                      child: Icon(
-                                        Icons.emoji_events,
-                                        color: Colors.blue,
-                                        size: 34,
-                                      ),
-                                    ),
-                                  )
+                                        errorWidget: (context, url, error) => Container(
+                                          width: 78,
+                                          height: 78,
+                                          color: Colors.blue.shade50,
+                                          child: const Icon(
+                                            Icons.emoji_events,
+                                            color: Colors.blue,
+                                            size: 34,
+                                          ),
+                                        ),
+                                      ))
                                 : Container(
                                     width: 78,
                                     height: 78,
                                     color: Colors.blue.shade50,
-                                    child: Icon(
+                                    child: const Icon(
                                       Icons.emoji_events,
                                       color: Colors.blue,
                                       size: 34,
                                     ),
                                   ),
                           ),
-                          SizedBox(width: 14),
+                          const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,7 +391,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     Expanded(
                                       child: Text(
                                         nome,
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.black87,
@@ -350,7 +399,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                       ),
                                     ),
                                     Container(
-                                      padding: EdgeInsets.symmetric(
+                                      padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
                                         vertical: 4,
                                       ),
@@ -361,18 +410,18 @@ class _ProfilePageState extends State<ProfilePage> {
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.check,
                                             color: Colors.green,
                                             size: 14,
                                           ),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            'Aprovado',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.green.shade700,
-                                              fontWeight: FontWeight.w600,
+                                          const SizedBox(width: 8),
+                                          SizedBox(
+                                            width: 80,
+                                            child: BadgeProgress(
+                                              atual: progressoAtual,
+                                              total: progressoTotal,
+                                              compact: true,
                                             ),
                                           ),
                                         ],
@@ -380,23 +429,15 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: 6),
-                                Text(
-                                  descricao,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                                SizedBox(height: 10),
+                                const SizedBox(height: 10),
                                 Row(
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.check_circle,
                                       color: Colors.green,
                                       size: 18,
                                     ),
-                                    SizedBox(width: 6),
+                                    const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
                                         'Conquistado em $dataConquista',
@@ -408,27 +449,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: 8),
-                                LinearProgressIndicator(
-                                  value: progressoTotal > 0
-                                      ? progressoAtual / progressoTotal
-                                      : 1,
-                                  minHeight: 8,
-                                  backgroundColor: Colors.grey.shade200,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Color(0xFF2563EB),
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                SizedBox(height: 6),
-                                Text(
-                                  '$progressoAtual / $progressoTotal',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[700],
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
+                                const SizedBox(height: 8),
                               ],
                             ),
                           ),
@@ -438,16 +459,16 @@ class _ProfilePageState extends State<ProfilePage> {
                   },
                 ),
 
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-              Text(
+              const Text(
                 'Estatísticas',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -458,7 +479,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
 
-              SizedBox(height: 32),
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -473,30 +494,30 @@ class _ProfilePageState extends State<ProfilePage> {
   }) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(14),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(color: Colors.black12, blurRadius: 4),
         ],
       ),
       child: Row(
         children: [
-          Icon(icon, color: Color(0xFF2563EB)),
-          SizedBox(width: 12),
+          Icon(icon, color: const Color(0xFF2563EB)),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
                   value,
-                  style: TextStyle(fontSize: 14, color: Colors.black87),
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
                 ),
               ],
             ),
@@ -509,11 +530,11 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _statCard(String title, String value) {
     return Container(
       width: 160,
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(color: Colors.black12, blurRadius: 4),
         ],
       ),
@@ -522,16 +543,16 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Color(0xFF2563EB),
             ),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             title,
-            style: TextStyle(fontSize: 11, color: Colors.grey),
+            style: const TextStyle(fontSize: 11, color: Colors.grey),
             textAlign: TextAlign.center,
           ),
         ],

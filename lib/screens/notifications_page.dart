@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
 class NotificationsPage extends StatefulWidget {
+  const NotificationsPage({super.key});
+
   @override
   State<NotificationsPage> createState() => _NotificationsPageState();
 }
@@ -37,15 +39,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('Notificações',
+        title: const Text('Notificações',
             style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         actions: [
           TextButton(
@@ -53,7 +55,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               await ApiService.marcarTodasLidas();
               _loadData();
             },
-            child: Text(
+            child: const Text(
               'Marcar todas',
               style: TextStyle(color: Color(0xFF2563EB), fontSize: 13),
             ),
@@ -70,8 +72,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
-                children: [
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
                   SizedBox(height: 400),
                   Center(child: CircularProgressIndicator()),
                 ],
@@ -79,9 +81,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
             }
             if (snapshot.hasError) {
               return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: [
-                  SizedBox(height: 400),
+                  const SizedBox(height: 400),
                   Center(child: Text('Erro: ${snapshot.error}')),
                 ],
               );
@@ -91,8 +93,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
             if (lista.isEmpty) {
               return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
-                children: [
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: const [
                   SizedBox(height: 400),
                   Center(child: Text('Sem notificações')),
                 ],
@@ -100,10 +102,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
             }
 
             return ListView.separated(
-              physics: AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.symmetric(vertical: 8),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: lista.length,
-              separatorBuilder: (_, __) => Divider(height: 1, indent: 16, endIndent: 16),
+              separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16),
               itemBuilder: (context, index) {
                 final n = lista[index];
                 final bool lida = n['lido'] == true;
@@ -112,7 +114,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 return Container(
                   color: Colors.white,
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -133,7 +135,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                   width: 12,
                                   height: 12,
                                   decoration: BoxDecoration(
-                                    color: Color(0xFF2563EB),
+                                    color: const Color(0xFF2563EB),
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                         color: Colors.white, width: 2),
@@ -143,7 +145,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           ],
                         ),
 
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
 
                         // Conteúdo
                         Expanded(
@@ -152,29 +154,29 @@ class _NotificationsPageState extends State<NotificationsPage> {
                             children: [
                               Text(
                                 n['mensagem'] ?? '',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 13,
                                   color: Colors.black87,
                                   height: 1.4,
                                 ),
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Row(
                                 children: [
                                   Text(
                                     lida ? 'Lida' : 'Não Lida',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: lida ? Colors.grey : Color(0xFF2563EB),
+                                      color: lida ? Colors.grey : const Color(0xFF2563EB),
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                   Text(
                                     ' · ${_tempoRelativo(n['dataenvio']?.toString())}',
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                         fontSize: 11, color: Colors.grey),
                                   ),
-                                  Spacer(),
+                                  const Spacer(),
 
                                   // Botão marcar lida
                                   if (!lida)
@@ -183,11 +185,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                         await ApiService.marcarLida(id);
                                         _loadData();
                                       },
-                                      child: Icon(Icons.check,
+                                      child: const Icon(Icons.check,
                                           size: 18, color: Colors.grey),
                                     ),
 
-                                  SizedBox(width: 12),
+                                  const SizedBox(width: 12),
 
                                   // Botão apagar
                                   GestureDetector(
@@ -195,7 +197,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                       await ApiService.apagarNotificacao(id);
                                       _loadData();
                                     },
-                                    child: Icon(Icons.delete_outline,
+                                    child: const Icon(Icons.delete_outline,
                                         size: 18, color: Colors.grey),
                                   ),
                                 ],
@@ -218,11 +220,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Widget _avatarIcon(String? tipo) {
     switch (tipo) {
       case 'EMAIL':
-        return Icon(Icons.email_outlined, color: Colors.white);
+        return const Icon(Icons.email_outlined, color: Colors.white);
       case 'PUSH':
-        return Icon(Icons.notifications_outlined, color: Colors.white);
+        return const Icon(Icons.notifications_outlined, color: Colors.white);
       default:
-        return Icon(Icons.info_outline, color: Colors.white);
+        return const Icon(Icons.info_outline, color: Colors.white);
     }
   }
 }

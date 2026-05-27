@@ -14,4 +14,5 @@ class Session {
   static String get email => utilizador['email']?.toString() ?? '';
   static String get fotoUrl => utilizador['fotourl']?.toString() ?? '';
   static int get pontos => int.tryParse('${utilizador['pontos'] ?? 0}') ?? 0;
+  static int get idArea => int.tryParse('${utilizador['idarea'] ?? 0}') ?? 0;
 }

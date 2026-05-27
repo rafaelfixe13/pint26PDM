@@ -5,6 +5,8 @@ import '../screens/main_page.dart';
 import '../screens/signup_page.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -53,7 +55,7 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => MainPage()),
+          MaterialPageRoute(builder: (_) => const MainPage()),
           (route) => false,
         );
       }
@@ -72,14 +74,14 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
               Center(
                 child: RichText(
-                  text: TextSpan(
+                  text: const TextSpan(
                     style: TextStyle(
                       fontSize: 36,
                       fontWeight: FontWeight.bold,
@@ -101,8 +103,8 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
-              SizedBox(height: 12),
-              Center(
+              const SizedBox(height: 12),
+              const Center(
                 child: Text('LOGIN',
                     style: TextStyle(
                         fontSize: 22,
@@ -110,58 +112,58 @@ class _LoginPageState extends State<LoginPage> {
                         color: Color(0xFF2563EB),
                         letterSpacing: 3)),
               ),
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
               AutofillGroup(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Email',
+                    const Text('Email',
                         style:
                             TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       autofillHints: const [AutofillHints.email],
                       decoration: InputDecoration(
                         hintText: 'xxx@softinsa.pt',
-                        hintStyle: TextStyle(color: Colors.grey),
+                        hintStyle: const TextStyle(color: Colors.grey),
                         filled: true,
-                        fillColor: Color(0xFFF1F5F9),
+                        fillColor: const Color(0xFFF1F5F9),
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none),
                         focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide:
-                                BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                                const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
                         contentPadding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       ),
                     ),
-                    SizedBox(height: 20),
-                    Text('Password',
+                    const SizedBox(height: 20),
+                    const Text('Password',
                         style:
                             TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: _passwordController,
                       obscureText: !_verPassword,
                       autofillHints: const [AutofillHints.password],
                       decoration: InputDecoration(
                         hintText: 'Introduza a sua password',
-                        hintStyle: TextStyle(color: Colors.grey),
+                        hintStyle: const TextStyle(color: Colors.grey),
                         filled: true,
-                        fillColor: Color(0xFFF1F5F9),
+                        fillColor: const Color(0xFFF1F5F9),
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none),
                         focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide:
-                                BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                                const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
                         contentPadding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         suffixIcon: IconButton(
                           icon: Icon(
                               _verPassword
@@ -176,34 +178,34 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Checkbox(
                     value: _manterSessao,
                     onChanged: (v) =>
                         setState(() => _manterSessao = v ?? false),
-                    activeColor: Color(0xFF2563EB),
+                    activeColor: const Color(0xFF2563EB),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(4)),
                   ),
-                  Text('Manter sessão iniciada',
+                  const Text('Manter sessão iniciada',
                       style:
                           TextStyle(fontSize: 13, color: Colors.black87)),
                 ],
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               if (_erro != null)
                 Padding(
-                  padding: EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline,
+                      const Icon(Icons.error_outline,
                           color: Colors.red, size: 16),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(_erro!,
-                            style: TextStyle(
+                            style: const TextStyle(
                                 color: Colors.red, fontSize: 13)),
                       ),
                     ],
@@ -215,48 +217,48 @@ class _LoginPageState extends State<LoginPage> {
                 child: ElevatedButton(
                   onPressed: _loading ? null : _login,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF2B4E8C),
+                    backgroundColor: const Color(0xFF2B4E8C),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _loading
-                      ? SizedBox(
+                      ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2))
-                      : Text('Entrar',
+                      : const Text('Entrar',
                           style: TextStyle(
                               fontSize: 16,
                               color: Colors.white,
                               fontWeight: FontWeight.w600)),
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Center(
                 child: GestureDetector(
                   onTap: () {},
-                  child: Text('Esqueceste-te da tua password?',
+                  child: const Text('Esqueceste-te da tua password?',
                       style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey,
                           decoration: TextDecoration.underline)),
                 ),
               ),
-              SizedBox(height: 60),
+              const SizedBox(height: 60),
               Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Não tem conta? ',
+                    const Text('Não tem conta? ',
                         style: TextStyle(
                             fontSize: 13, color: Colors.black87)),
                     GestureDetector(
                       onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => SignUpPage())),
-                      child: Text('Registe-se.',
+                              builder: (_) => const SignUpPage())),
+                      child: const Text('Registe-se.',
                           style: TextStyle(
                               fontSize: 13,
                               color: Color(0xFF2563EB),
