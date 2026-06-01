@@ -194,7 +194,12 @@ app.get("/badges", async (req, res) => {
       // Tabela de badges não existe: retornar lista vazia para evitar crash na app
       return res.json([]);
     }
-    const result = await pool.query("SELECT * FROM badges ORDER BY idbadge ASC");
+    const result = await pool.query(
+      `SELECT b.*, n.nome AS nivel
+       FROM badges b
+       LEFT JOIN nivel n ON n.idnivel = b.idnivel
+       ORDER BY b.idbadge ASC`
+    );
     res.json(result.rows);
   } catch (err) {
     console.error("Erro ao buscar badges:", err.message);
@@ -232,19 +237,225 @@ app.get("/badges/recomendados/:userId", async (req, res) => {
       return res.json([]);
     }
 
-    const result = await pool.query(
-      `
-      SELECT b.*
-      FROM badges b
-      WHERE b.idarea = $1
-      ORDER BY b.idbadge ASC
-      `,
-      [idArea]
+    // Determine highest nivel in DB
+    const highestNivelRes = await pool.query("SELECT MAX(idnivel)::int as maxnivel FROM nivel");
+    const highestNivel = highestNivelRes.rows[0]?.maxnivel ?? 1;
+
+    // User's highest nivel already completed (consider submitted or fully progressed candidaturas)
+    const userMaxNivelRes = await pool.query(
+      `SELECT MAX(b.idnivel)::int as maxnivel
+       FROM candidaturasbadge cb
+       INNER JOIN badges b ON b.idbadge = cb.badge_id
+       WHERE cb.user_id = $1
+         AND (
+           cb.estado = 'SUBMITTED' OR (cb.progresso_total > 0 AND cb.progresso_atual >= cb.progresso_total)
+         )`,
+      [userId]
     );
 
-    res.json(result.rows);
+    let userMaxNivel = userMaxNivelRes.rows[0]?.maxnivel;
+    if (!userMaxNivel) userMaxNivel = 1;
+
+    // Preferred "next" level: if already at highest, prefer level below
+    const nextNivel = userMaxNivel < highestNivel ? userMaxNivel + 1 : Math.max(1, userMaxNivel - 1);
+
+    // Check whether the user has completed ALL badges in their current max nivel
+    const totalBadgesRes = await pool.query(
+      `SELECT COUNT(*)::int as total FROM badges WHERE idarea = $1 AND idnivel = $2 AND ativo = TRUE`,
+      [idArea, userMaxNivel]
+    );
+    const totalBadgesThisNivel = totalBadgesRes.rows[0]?.total ?? 0;
+
+    const userCompletedCountRes = await pool.query(
+      `SELECT COUNT(DISTINCT b.idbadge)::int as completed
+       FROM candidaturasbadge cb
+       INNER JOIN badges b ON b.idbadge = cb.badge_id
+       WHERE cb.user_id = $1
+         AND b.idarea = $2
+         AND b.idnivel = $3
+         AND (
+           cb.estado = 'SUBMITTED' OR (cb.progresso_total > 0 AND cb.progresso_atual >= cb.progresso_total)
+         )`,
+      [userId, idArea, userMaxNivel]
+    );
+    const userCompletedThisNivel = userCompletedCountRes.rows[0]?.completed ?? 0;
+
+    // If user completed all badges in this nivel, prefer the nextNivel; otherwise keep current nivel as preferred
+    const allCompletedThisNivel = totalBadgesThisNivel > 0 && userCompletedThisNivel >= totalBadgesThisNivel;
+    let preferredNivel = allCompletedThisNivel ? nextNivel : userMaxNivel;
+    // If preferred nivel has no recommendable badges (all excluded or none exist), fall back to current nivel
+    const preferredAvailableRes = await pool.query(
+      `SELECT COUNT(*)::int as total FROM badges b
+       WHERE b.idarea = $1 AND b.idnivel = $2 AND b.ativo = TRUE
+         AND NOT EXISTS (
+           SELECT 1 FROM candidaturasbadge cb2
+           WHERE cb2.user_id = $3
+             AND cb2.badge_id = b.idbadge
+             AND (
+               cb2.estado = 'SUBMITTED' OR (cb2.progresso_total > 0 AND cb2.progresso_atual >= cb2.progresso_total)
+             )
+         )`,
+      [idArea, preferredNivel, userId]
+    );
+    const preferredAvailable = preferredAvailableRes.rows[0]?.total ?? 0;
+    if (preferredAvailable === 0) {
+      preferredNivel = userMaxNivel;
+    }
+    // secondary priority is the other one
+    const secondaryNivel = preferredNivel === userMaxNivel ? nextNivel : userMaxNivel;
+
+    const recomendQuery = `
+      SELECT
+        b.*, n.nome AS nivel,
+        COALESCE(cb.progresso_atual, 0) as progresso_atual,
+        COALESCE(cb.progresso_total, (
+          SELECT COUNT(*) FROM requisitos r WHERE r.idbadge = b.idbadge AND r.ativo = TRUE
+        )) as progresso_total
+      FROM badges b
+      LEFT JOIN nivel n ON n.idnivel = b.idnivel
+      LEFT JOIN candidaturasbadge cb ON cb.badge_id = b.idbadge AND cb.user_id = $1
+      WHERE b.idarea = $2
+        AND NOT EXISTS (
+          SELECT 1 FROM candidaturasbadge cb2
+          WHERE cb2.user_id = $1
+            AND cb2.badge_id = b.idbadge
+            AND (
+              cb2.estado = 'SUBMITTED' OR (cb2.progresso_total > 0 AND cb2.progresso_atual >= cb2.progresso_total)
+            )
+        )
+      ORDER BY
+        CASE
+          WHEN b.idnivel = $3 THEN 0
+          WHEN b.idnivel = $4 THEN 1
+          WHEN b.idnivel < $3 THEN 2
+          ELSE 3
+        END,
+        b.idnivel DESC,
+        b.pontos DESC
+    `;
+
+    const recResult = await pool.query(recomendQuery, [userId, idArea, preferredNivel, secondaryNivel]);
+    res.json(recResult.rows);
   } catch (err) {
     console.error("Erro ao buscar badges recomendados:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// RECOMENDAÇÕES PERSONALIZADAS POR UTILIZADOR
+// Ordena por: mesmo nível do maior nível conquistado -> próximo nível -> níveis abaixo
+// Exclui badges já conquistados (candidaturas completadas)
+app.get("/utilizadores/:id/recomendacoes", async (req, res) => {
+  try {
+    const idUtilizador = parseInt(req.params.id, 10);
+    if (isNaN(idUtilizador)) return res.status(400).json({ error: "ID do utilizador inválido" });
+
+    // obter área do utilizador
+    const userResult = await pool.query("SELECT idarea FROM utilizadores WHERE idutilizador = $1", [idUtilizador]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: "Utilizador não encontrado" });
+    const idArea = userResult.rows[0].idarea;
+    if (!idArea) return res.json([]);
+
+    // maior idnivel existente (limites)
+    const highestNivelRes = await pool.query("SELECT MAX(idnivel)::int as maxnivel FROM nivel");
+    const highestNivel = highestNivelRes.rows[0]?.maxnivel ?? 1;
+
+    // maior nível que o utilizador já completou (candidaturas submetidas)
+    const userMaxNivelRes = await pool.query(
+      `SELECT MAX(b.idnivel)::int as maxnivel
+       FROM candidaturasbadge cb
+       INNER JOIN badges b ON b.idbadge = cb.badge_id
+       WHERE cb.user_id = $1
+         AND (
+           cb.estado = 'SUBMITTED' OR (cb.progresso_total > 0 AND cb.progresso_atual >= cb.progresso_total)
+         )`,
+      [idUtilizador]
+    );
+
+    let userMaxNivel = userMaxNivelRes.rows[0]?.maxnivel;
+    if (!userMaxNivel) userMaxNivel = 1;
+
+    // calcular o 'próximo nível' preferido: se já no maior nível, preferir nível abaixo
+    const nextNivel = userMaxNivel < highestNivel ? userMaxNivel + 1 : Math.max(1, userMaxNivel - 1);
+
+    // Verificar se o utilizador completou TODOS os badges neste nivel
+    const totalBadgesRes2 = await pool.query(
+      `SELECT COUNT(*)::int as total FROM badges WHERE idarea = $1 AND idnivel = $2 AND ativo = TRUE`,
+      [idArea, userMaxNivel]
+    );
+    const totalBadgesThisNivel2 = totalBadgesRes2.rows[0]?.total ?? 0;
+
+    const userCompletedCountRes2 = await pool.query(
+      `SELECT COUNT(DISTINCT b.idbadge)::int as completed
+       FROM candidaturasbadge cb
+       INNER JOIN badges b ON b.idbadge = cb.badge_id
+       WHERE cb.user_id = $1
+         AND b.idarea = $2
+         AND b.idnivel = $3
+         AND (
+           cb.estado = 'SUBMITTED' OR (cb.progresso_total > 0 AND cb.progresso_atual >= cb.progresso_total)
+         )`,
+      [idUtilizador, idArea, userMaxNivel]
+    );
+    const userCompletedThisNivel2 = userCompletedCountRes2.rows[0]?.completed ?? 0;
+
+    const allCompletedThisNivel2 = totalBadgesThisNivel2 > 0 && userCompletedThisNivel2 >= totalBadgesThisNivel2;
+    let preferredNivel2 = allCompletedThisNivel2 ? nextNivel : userMaxNivel;
+    // If preferred nivel has no recommendable badges, fall back to current nivel
+    const preferredAvailableRes2 = await pool.query(
+      `SELECT COUNT(*)::int as total FROM badges b
+       WHERE b.idarea = $1 AND b.idnivel = $2 AND b.ativo = TRUE
+         AND NOT EXISTS (
+           SELECT 1 FROM candidaturasbadge cb2
+           WHERE cb2.user_id = $3
+             AND cb2.badge_id = b.idbadge
+             AND (
+               cb2.estado = 'SUBMITTED' OR (cb2.progresso_total > 0 AND cb2.progresso_atual >= cb2.progresso_total)
+             )
+         )`,
+      [idArea, preferredNivel2, idUtilizador]
+    );
+    const preferredAvailable2 = preferredAvailableRes2.rows[0]?.total ?? 0;
+    if (preferredAvailable2 === 0) {
+      preferredNivel2 = userMaxNivel;
+    }
+    const secondaryNivel2 = preferredNivel2 === userMaxNivel ? nextNivel : userMaxNivel;
+
+    const recomendQuery = `
+      SELECT
+        b.*, n.nome AS nivel,
+        COALESCE(cb.progresso_atual, 0) as progresso_atual,
+        COALESCE(cb.progresso_total, (
+          SELECT COUNT(*) FROM requisitos r WHERE r.idbadge = b.idbadge AND r.ativo = TRUE
+        )) as progresso_total
+      FROM badges b
+      LEFT JOIN nivel n ON n.idnivel = b.idnivel
+      LEFT JOIN candidaturasbadge cb ON cb.badge_id = b.idbadge AND cb.user_id = $1
+      WHERE b.idarea = $2
+        AND NOT EXISTS (
+          SELECT 1 FROM candidaturasbadge cb2
+          WHERE cb2.user_id = $1
+            AND cb2.badge_id = b.idbadge
+            AND (
+              cb2.estado = 'SUBMITTED' OR (cb2.progresso_total > 0 AND cb2.progresso_atual >= cb2.progresso_total)
+            )
+        )
+      ORDER BY
+        CASE
+          WHEN b.idnivel = $3 THEN 0
+          WHEN b.idnivel = $4 THEN 1
+          WHEN b.idnivel < $3 THEN 2
+          ELSE 3
+        END,
+        b.idnivel DESC,
+        b.pontos DESC
+    `;
+
+    const recResult = await pool.query(recomendQuery, [idUtilizador, idArea, preferredNivel2, secondaryNivel2]);
+    res.json(recResult.rows);
+  } catch (err) {
+    console.error("Erro ao buscar recomendacoes:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -317,17 +528,19 @@ app.get("/utilizadores/:id/candidaturas", async (req, res) => {
               THEN 'Submetido'
             ELSE CONCAT(cb.progresso_atual, '/', cb.progresso_total)
           END AS estado_visual,
-          b.idbadge,
-          b.nome,
-          b.descricao,
-          b.imagemurl,
-          b.idnivel,
-          b.pontos,
+            b.idbadge,
+            b.nome,
+            b.descricao,
+            b.imagemurl,
+            b.idnivel,
+            n.nome AS nivel,
+            b.pontos,
           b.linkpublicobase,
           b.competencias,
           b.certificado
         FROM candidaturasbadge cb
         INNER JOIN badges b ON b.idbadge = cb.badge_id
+        LEFT JOIN nivel n ON n.idnivel = b.idnivel
         WHERE cb.user_id = $1
         ORDER BY cb.datacriacao DESC
       `, [idUtilizador]);
@@ -630,6 +843,7 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
       `
       SELECT 
         b.*,
+        n.nome AS nivel,
         COALESCE(cb.progresso_atual, 0) as progresso_atual,
         COALESCE(cb.progresso_total, requisitos_count.total) as progresso_total,
         FALSE as conquistado,
@@ -645,6 +859,7 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
           ELSE CONCAT(COALESCE(cb.progresso_atual, 0), '/', COALESCE(cb.progresso_total, requisitos_count.total))
         END AS estado_visual
       FROM badges b
+      LEFT JOIN nivel n ON n.idnivel = b.idnivel
       LEFT JOIN candidaturasbadge cb ON cb.badge_id = b.idbadge AND cb.user_id = $1
       LEFT JOIN LATERAL (
         SELECT COUNT(*)::int as total

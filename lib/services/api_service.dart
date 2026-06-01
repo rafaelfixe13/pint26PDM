@@ -119,7 +119,8 @@ class ApiService {
     }
 
     final response = await http.get(
-      Uri.parse('$baseUrl/badges/recomendados/$userId'),
+      // Use the personalized recommendations endpoint
+      Uri.parse('$baseUrl/utilizadores/$userId/recomendacoes'),
       headers: {'Accept': 'application/json'},
     );
 

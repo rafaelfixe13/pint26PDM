@@ -23,6 +23,7 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   late Future<List<dynamic>> _badgesFuture;
+  late Future<List<dynamic>> _recomendadosFuture;
   late Future<List<dynamic>> _candidaturasFuture;
   late Future<List<dynamic>> _notificacoesFuture;
 
@@ -34,6 +35,7 @@ class _MainPageState extends State<MainPage> {
 
   void _loadData() {
     _badgesFuture = ApiService.getBadges();
+    _recomendadosFuture = ApiService.getBadgesRecomendados(Session.id);
     _candidaturasFuture = ApiService.getCandidaturas();
     _notificacoesFuture = ApiService.getNotificacoes();
     if (mounted) setState(() {});
@@ -292,58 +294,62 @@ class _MainPageState extends State<MainPage> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: (listaBadges.isEmpty
-                                ? List.filled(2, null)
-                                : listaBadges)
-                            .take(2)
-                            .map<Widget>((b) {
-                              if (b == null) {
-                                return const Expanded(
-                                  child: Padding(
-                                    padding: EdgeInsets.only(right: 8),
-                                    child: SizedBox.shrink(),
-                                  ),
-                                );
-                              }
+                      FutureBuilder<List<dynamic>>(
+                        future: _recomendadosFuture,
+                        builder: (context, recSnap) {
+                          final recomendados = recSnap.data ?? [];
+                          return Row(
+                            children: (recomendados.isEmpty
+                                    ? List.filled(2, null)
+                                    : recomendados)
+                                .take(2)
+                                .map<Widget>((b) {
+                                  if (b == null) {
+                                    return const Expanded(
+                                      child: Padding(
+                                        padding: EdgeInsets.only(right: 8),
+                                        child: SizedBox.shrink(),
+                                      ),
+                                    );
+                                  }
 
-                              final badgeId = int.tryParse(b['idbadge']?.toString() ?? '') ??
-                                  (b['id'] is int ? b['id'] as int : 0);
+                                  final badgeId = int.tryParse(b['idbadge']?.toString() ?? '') ??
+                                      (b['id'] is int ? b['id'] as int : 0);
 
-                              final candidatura = candidaturasByBadgeId[badgeId];
+                                  final candidatura = candidaturasByBadgeId[badgeId];
 
-                              // If there's a candidatura for this badge, merge its progress
-                              // into the badge object so _miniCard can read progresso_atual/total.
-                              dynamic renderedBadge = b;
-                              if (candidatura != null) {
-                                try {
-                                  renderedBadge = Map<String, dynamic>.from(b as Map)
-                                    ..['progresso_atual'] = candidatura['progresso_atual']
-                                    ..['progresso_total'] = candidatura['progresso_total'];
-                                } catch (_) {
-                                  renderedBadge = b;
-                                }
-                              }
+                                  dynamic renderedBadge = b;
+                                  if (candidatura != null) {
+                                    try {
+                                      renderedBadge = Map<String, dynamic>.from(b as Map)
+                                        ..['progresso_atual'] = candidatura['progresso_atual']
+                                        ..['progresso_total'] = candidatura['progresso_total'];
+                                    } catch (_) {
+                                      renderedBadge = b;
+                                    }
+                                  }
 
-                              return Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: _miniCard(
-                                    renderedBadge,
-                                    showProgress: candidatura != null,
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => BadgeDetailPage(
-                                          badge: b,
-                                          candidatura: candidatura,
+                                  return Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: _miniCard(
+                                        renderedBadge,
+                                        showProgress: candidatura != null,
+                                        onTap: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => BadgeDetailPage(
+                                              badge: b,
+                                              candidatura: candidatura,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                                  );
+                                }).toList(),
+                          );
+                        },
                       ),
                       const SizedBox(height: 24),
                     ],
@@ -618,6 +624,14 @@ class _MainPageState extends State<MainPage> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 4),
+          // Show badge level (nivel) when available
+          if (badge?['nivel'] != null)
+            Text(
+              badge['nivel'].toString(),
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
           const SizedBox(height: 6),
           // Always show a compact progress indicator (number of requirements completed)
           BadgeProgress(atual: atual, total: total, compact: true),
