@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 // ─── Content model ───────────────────────────────────────────────────────────
 
 abstract class AjudaContent {}
@@ -173,7 +174,6 @@ final List<AjudaItem> ajudaItems = [
 
 class AjudaPage extends StatefulWidget {
   const AjudaPage({super.key});
-
   @override
   State<AjudaPage> createState() => _AjudaPageState();
 }
@@ -198,9 +198,9 @@ class _AjudaPageState extends State<AjudaPage> {
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop (context),
-                      child: const Icon(Icons.arrow_back,
+                    child: IconButton(
+                      onPressed: () => context.go('/main'),
+                      icon: const Icon(Icons.arrow_back,
                           color: Colors.black87, size: 24),
                     ),
                   ),

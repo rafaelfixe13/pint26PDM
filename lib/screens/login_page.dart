@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import 'package:go_router/go_router.dart';
+import '../services/cache_service.dart';
 import '../services/session.dart';
-import '../screens/main_page.dart';
-import '../screens/signup_page.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -43,26 +43,33 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final resultado = await ApiService.login(email, password);
+      // Usa o CacheService → tenta API e guarda em SQLite,
+      // ou faz fallback para sessão local em modo offline.
+      final resultado = await CacheService.login(email, password);
 
-      // guarda o utilizador na session
+      // guarda o utilizador na session em memória
       Session.iniciar(resultado['utilizador']);
 
-      // ← carrega a foto guardada localmente
+      // Aviso opcional: se entrou em modo offline
+      if (resultado['offline'] == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Entraste em modo offline (sem ligação ao servidor).'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
 
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => MainPage()),
-          (route) => false,
-        );
+        context.go('/main');
       }
     } catch (e) {
       setState(() {
         _erro = e.toString().replaceAll('Exception: ', '');
       });
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -111,60 +118,69 @@ class _LoginPageState extends State<LoginPage> {
                         letterSpacing: 3)),
               ),
               SizedBox(height: 40),
-              Text('Email',
-                  style:
-                      TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              SizedBox(height: 8),
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'xxx@softinsa.pt',
-                  hintStyle: TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: Color(0xFFF1F5F9),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                ),
-              ),
-              SizedBox(height: 20),
-              Text('Password',
-                  style:
-                      TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              SizedBox(height: 8),
-              TextField(
-                controller: _passwordController,
-                obscureText: !_verPassword,
-                decoration: InputDecoration(
-                  hintText: 'Introduza a sua password',
-                  hintStyle: TextStyle(color: Colors.grey),
-                  filled: true,
-                  fillColor: Color(0xFFF1F5F9),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                        _verPassword
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        color: Colors.grey),
-                    onPressed: () =>
-                        setState(() => _verPassword = !_verPassword),
-                  ),
+              AutofillGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Email',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w500, fontSize: 14)),
+                    SizedBox(height: 8),
+                    TextField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.email],
+                      decoration: InputDecoration(
+                        hintText: 'xxx@softinsa.pt',
+                        hintStyle: TextStyle(color: Colors.grey),
+                        filled: true,
+                        fillColor: Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                                color: Color(0xFF2563EB), width: 1.5)),
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    Text('Password',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w500, fontSize: 14)),
+                    SizedBox(height: 8),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: !_verPassword,
+                      autofillHints: const [AutofillHints.password],
+                      decoration: InputDecoration(
+                        hintText: 'Introduza a sua password',
+                        hintStyle: TextStyle(color: Colors.grey),
+                        filled: true,
+                        fillColor: Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                                color: Color(0xFF2563EB), width: 1.5)),
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                              _verPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: Colors.grey),
+                          onPressed: () =>
+                              setState(() => _verPassword = !_verPassword),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               SizedBox(height: 16),
@@ -179,8 +195,7 @@ class _LoginPageState extends State<LoginPage> {
                         borderRadius: BorderRadius.circular(4)),
                   ),
                   Text('Manter sessão iniciada',
-                      style:
-                          TextStyle(fontSize: 13, color: Colors.black87)),
+                      style: TextStyle(fontSize: 13, color: Colors.black87)),
                 ],
               ),
               SizedBox(height: 8),
@@ -189,13 +204,12 @@ class _LoginPageState extends State<LoginPage> {
                   padding: EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline,
-                          color: Colors.red, size: 16),
+                      Icon(Icons.error_outline, color: Colors.red, size: 16),
                       SizedBox(width: 6),
                       Expanded(
                         child: Text(_erro!,
-                            style: TextStyle(
-                                color: Colors.red, fontSize: 13)),
+                            style:
+                                TextStyle(color: Colors.red, fontSize: 13)),
                       ),
                     ],
                   ),
@@ -240,13 +254,10 @@ class _LoginPageState extends State<LoginPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text('Não tem conta? ',
-                        style: TextStyle(
-                            fontSize: 13, color: Colors.black87)),
+                        style:
+                            TextStyle(fontSize: 13, color: Colors.black87)),
                     GestureDetector(
-                      onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => SignUpPage())),
+                      onTap: () => context.push('/signup'),
                       child: Text('Registe-se.',
                           style: TextStyle(
                               fontSize: 13,

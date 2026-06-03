@@ -1,22 +1,35 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
-import 'badge_detail_page.dart';
+import '../services/cache_service.dart';
+import '../widgets/base64_image_widget.dart';
+import 'package:go_router/go_router.dart';
 
 class BadgesPage extends StatefulWidget {
+  const BadgesPage({super.key});
   @override
   State<BadgesPage> createState() => _BadgesPageState();
 }
 
 class _BadgesPageState extends State<BadgesPage> {
   late Future<List<dynamic>> _badgesFuture;
+  late Future<List<dynamic>> _areasFuture;
+  late Future<List<dynamic>> _nivelsFuture;
+  late Future<List<dynamic>> _especiaisFuture;
 
   List<dynamic> _todos = [];       // lista completa da API
   List<dynamic> _visiveis = [];    // lista filtrada + lazy
-  List<dynamic> _filtrados = [];   // lista após pesquisa
+  List<dynamic> _filtrados = [];   // lista após pesquisa
+  List<dynamic> _areas = [];       // lista de áreas
+  List<dynamic> _niveis = [];      // lista de níveis
+  List<dynamic> _especiais = [];   // lista de especiais
 
   final int _porPagina = 6;        // quantos carregar de cada vez
   int _carregados = 0;
   bool _temMais = false;
+
+  // Filtros
+  String? _selectedArea;
+  int? _selectedNivel;
+  int? _selectedEspecial;
 
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -49,28 +62,64 @@ class _BadgesPageState extends State<BadgesPage> {
   }
 
   void _loadData() {
-    setState(() {
-      _badgesFuture = ApiService.getBadges();
-    });
+  setState(() {
+    _badgesFuture = CacheService.getBadgesDoUtilizador(); // antes: ApiService.getBadgesDoUtilizador()
+    _areasFuture = CacheService.getAreas(); // antes: ApiService.getAreas()
+    _nivelsFuture = CacheService.getNiveis(); // antes: ApiService.getNiveis()
+    _especiaisFuture = CacheService.getEspeciais(); // antes: ApiService.getEspeciais()
+  });
     _badgesFuture.then((lista) {
       setState(() {
         _todos = lista;
         _filtrar(_searchController.text);
       });
     });
+    _areasFuture.then((lista) {
+      setState(() {
+        _areas = lista;
+      });
+    });
+    _nivelsFuture.then((lista) {
+      setState(() {
+        _niveis = lista;
+      });
+    });
+    _especiaisFuture.then((lista) {
+      setState(() {
+        _especiais = lista;
+      });
+    });
   }
 
-  // filtra por nome e reinicia o lazy loading
+  // filtra por nome, nível, área e especial e reinicia o lazy loading
   void _filtrar(String query) {
     setState(() {
-      _filtrados = query.isEmpty
-          ? List.from(_todos)
-          : _todos
-              .where((b) => (b['nome'] ?? '')
-                  .toString()
-                  .toLowerCase()
-                  .contains(query.toLowerCase()))
-              .toList();
+      _filtrados = _todos.where((b) {
+        // Filtro por nome
+        final nomeMatch = query.isEmpty
+            ? true
+            : (b['nome'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(query.toLowerCase());
+
+        // Filtro por nível
+        final nivelMatch = _selectedNivel == null
+            ? true
+            : (b['idnivel'] ?? 1) == _selectedNivel;
+
+        // Filtro por área
+        final areaMatch = _selectedArea == null
+            ? true
+            : (b['idarea']?.toString() ?? '') == _selectedArea;
+
+        // Filtro por especial
+        final especialMatch = _selectedEspecial == null
+            ? true
+            : (b['idespecial'] ?? -1) == _selectedEspecial;
+
+        return nomeMatch && nivelMatch && areaMatch && especialMatch;
+      }).toList();
 
       _carregados = 0;
       _visiveis = [];
@@ -79,7 +128,6 @@ class _BadgesPageState extends State<BadgesPage> {
   }
 
   void _carregarMais() {
-    final proximo = _carregados + _porPagina;
     final novos = _filtrados.skip(_carregados).take(_porPagina).toList();
     setState(() {
       _visiveis.addAll(novos);
@@ -97,7 +145,7 @@ class _BadgesPageState extends State<BadgesPage> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.go('/main'),
         ),
         title: Container(
           height: 40,
@@ -126,105 +174,209 @@ class _BadgesPageState extends State<BadgesPage> {
           ),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          _searchController.clear();
-          _loadData();
-          await _badgesFuture;
-        },
-        child: FutureBuilder<List<dynamic>>(
-          future: _badgesFuture,
-          builder: (context, snapshot) {
-            // loading inicial
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                _todos.isEmpty) {
-              return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(height: 400),
-                  Center(child: CircularProgressIndicator()),
-                ],
-              );
-            }
-
-            if (snapshot.hasError && _todos.isEmpty) {
-              return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(height: 400),
-                  Center(child: Text('Erro: ${snapshot.error}')),
-                ],
-              );
-            }
-
-            if (_visiveis.isEmpty && _searchController.text.isNotEmpty) {
-              return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(height: 400),
-                  Center(
-                    child: Column(
+      body: Column(
+        children: [
+          // Filtros
+          Padding(
+            padding: EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Filtro de Nível
+                Expanded(
+                  child: DropdownButtonFormField<int?>(
+                    value: _selectedNivel,
+                    decoration: InputDecoration(
+                      labelText: 'Nível',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: [
+                      DropdownMenuItem<int?>(value: null, child: Text('Todos')),
+                      ..._niveis.map((nivel) => DropdownMenuItem<int?>(
+                        value: nivel['idnivel'],
+                        child: Text(nivel['nome'] ?? 'Nível ${nivel['idnivel']}'),
+                      )),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedNivel = value);
+                      _filtrar(_searchController.text);
+                    },
+                  ),
+                ),
+                SizedBox(width: 12),
+                // Filtro de Área
+                Expanded(
+                  child: DropdownButtonFormField<String?>(
+                    value: _selectedArea,
+                    decoration: InputDecoration(
+                      labelText: 'Área',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: [
+                      DropdownMenuItem<String?>(value: null, child: Text('Todas')),
+                      ..._areas.map((area) => DropdownMenuItem<String?>(
+                        value: area['idarea'].toString(),
+                        child: Text(area['nome'] ?? 'Sem nome'),
+                      )),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedArea = value);
+                      _filtrar(_searchController.text);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Filtro de Especial
+          Padding(
+            padding: EdgeInsets.only(left: 12, right: 12, bottom: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<int?>(
+                    value: _selectedEspecial,
+                    decoration: InputDecoration(
+                      labelText: 'Especial',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: [
+                      DropdownMenuItem<int?>(value: null, child: Text('Todos')),
+                      ..._especiais.map((especial) => DropdownMenuItem<int?>(
+                        value: especial['idespecial'],
+                        child: Text(especial['nome'] ?? 'Especial ${especial['idespecial']}'),
+                      )),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedEspecial = value);
+                      _filtrar(_searchController.text);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Lista de badges
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                _searchController.clear();
+                _loadData();
+                await _badgesFuture;
+              },
+              child: FutureBuilder<List<dynamic>>(
+                future: _badgesFuture,
+                builder: (context, snapshot) {
+                  // loading inicial
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      _todos.isEmpty) {
+                    return ListView(
+                      physics: AlwaysScrollableScrollPhysics(),
                       children: [
-                        Icon(Icons.search_off, size: 48, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text(
-                          'Nenhum badge encontrado',
-                          style: TextStyle(color: Colors.grey),
+                        SizedBox(height: 400),
+                        Center(child: CircularProgressIndicator()),
+                      ],
+                    );
+                  }
+
+                  if (snapshot.hasError && _todos.isEmpty) {
+                    return ListView(
+                      physics: AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(height: 400),
+                        Center(child: Text('Erro: ${snapshot.error}')),
+                      ],
+                    );
+                  }
+
+                  if (_visiveis.isEmpty && _searchController.text.isNotEmpty) {
+                    return ListView(
+                      physics: AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(height: 400),
+                        Center(
+                          child: Column(
+                            children: [
+                              Icon(Icons.search_off, size: 48, color: Colors.grey),
+                              SizedBox(height: 8),
+                              Text(
+                                'Nenhum badge encontrado',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                    ),
-                  ),
-                ],
-              );
-            }
+                    );
+                  }
 
-            if (_visiveis.isEmpty) {
-              return ListView(
-                physics: AlwaysScrollableScrollPhysics(),
-                children: [
-                  SizedBox(height: 400),
-                  Center(child: Text('Sem badges')),
-                ],
-              );
-            }
+                  if (_visiveis.isEmpty) {
+                    return ListView(
+                      physics: AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(height: 400),
+                        Center(child: Text('Sem badges')),
+                      ],
+                    );
+                  }
 
-            return GridView.builder(
-              controller: _scrollController,
-              physics: AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.all(12),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.58,
-              ),
-              // +1 para o indicador de "a carregar mais" no fundo
-              itemCount: _visiveis.length + (_temMais ? 1 : 0),
-              itemBuilder: (context, index) {
-                // último item = indicador de carregamento
-                if (index == _visiveis.length) {
-                  return Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                  return GridView.builder(
+                    controller: _scrollController,
+                    physics: AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.all(12),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.58,
                     ),
+                    itemCount: _visiveis.length + (_temMais ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      // último item = indicador de carregamento
+                      if (index == _visiveis.length) {
+                        return Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      }
+
+                      final badge = _visiveis[index];
+                      return GestureDetector(
+                        onTap: () {
+                          // O endpoint já devolve campos do candidaturasbadge via LEFT JOIN.
+                          // Se 'estado' não for null, o utilizador já tem candidatura para este badge.
+                          final candidatura = badge['estado'] != null
+                              ? <String, dynamic>{
+                                  'estado': badge['estado'],
+                                  'progresso_atual': badge['progresso_atual'],
+                                  'progresso_total': badge['progresso_total'],
+                                  'datasubmissao': badge['datasubmissao'],
+                                }
+                              : null;
+                          context.push('/badge_detail', extra: {
+                            'badge': badge,
+                            'candidatura': candidatura,
+                          });
+                        },
+                        child: _BadgeCard(badge: badge),
+                      );
+                    },
                   );
-                }
-
-                final badge = _visiveis[index];
-                return GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => BadgeDetailPage(badge: badge),
-                    ),
-                  ),
-                  child: _BadgeCard(badge: badge),
-                );
-              },
-            );
-          },
-        ),
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -253,12 +405,17 @@ class _BadgeCard extends StatelessWidget {
         children: [
           badge['imagemurl'] != null &&
                   badge['imagemurl'].toString().isNotEmpty
-              ? Image.network(
-                  badge['imagemurl'],
+              ? Base64ImageWidget(
+                  imageData: badge['imagemurl']
+                      .toString()
+                      .replaceAll('localhost', '10.0.2.2')
+                      .replaceAll('127.0.0.1', '10.0.2.2')
+                      .replaceAll('100.105.58.22', '10.0.2.2')
+                      .replaceAll('0.0.0.0', '10.0.2.2'),
                   width: 80,
                   height: 80,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Icon(Icons.emoji_events,
+                  errorWidget: Icon(Icons.emoji_events,
                       size: 80, color: Color(0xFF2563EB)),
                 )
               : Icon(Icons.emoji_events, size: 80, color: Color(0xFF2563EB)),
@@ -295,8 +452,10 @@ class _BadgeCard extends StatelessWidget {
                 decoration: BoxDecoration(
                     color: Colors.black,
                     borderRadius: BorderRadius.circular(999)),
-                child: Text(badge['nivel'] ?? 'N/A',
-                    style: TextStyle(color: Colors.white, fontSize: 10)),
+                child: Text(
+                  _getNivelNome(badge['idnivel']),
+                  style: TextStyle(color: Colors.white, fontSize: 10),
+                ),
               ),
               SizedBox(width: 6),
               Icon(Icons.star, size: 12, color: Colors.amber),
@@ -357,5 +516,10 @@ class _BadgeCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(8)),
       child: Icon(icon, size: 15, color: color),
     );
+  }
+
+  String _getNivelNome(dynamic idnivel) {
+    if (idnivel == null) return 'N/A';
+    return 'Nível $idnivel';
   }
 }

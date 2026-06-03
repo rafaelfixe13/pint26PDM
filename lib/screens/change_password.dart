@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../services/api_service.dart';
+import '../services/basededados.dart';
+import '../services/cache_service.dart';
+import '../services/session.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -83,6 +87,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     try {
       await ApiService.alterarPassword(current, nova);
+      await Basededados().guardarSessao(Session.utilizador, CacheService.hashPassword(nova));
 
       if (!mounted) return;
 
@@ -93,7 +98,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         ),
       );
 
-      Navigator.pop(context);
+      context.pop();
     } catch (e) {
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
@@ -114,7 +119,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.grey),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.go('/main'),
         ),
         title: const Text(
           'Alterar Password',

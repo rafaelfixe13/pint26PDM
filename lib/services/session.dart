@@ -1,12 +1,15 @@
 class Session {
   static Map<String, dynamic> utilizador = {};
+  static bool lembretesMostrados = false;
 
   static void iniciar(Map<String, dynamic> user) {
     utilizador = Map<String, dynamic>.from(user);
+    lembretesMostrados = false;
   }
 
   static void terminar() {
     utilizador = {};
+    lembretesMostrados = false;
   }
 
   static int get id => int.tryParse('${utilizador['idutilizador'] ?? 0}') ?? 0;
@@ -14,4 +17,5 @@ class Session {
   static String get email => utilizador['email']?.toString() ?? '';
   static String get fotoUrl => utilizador['fotourl']?.toString() ?? '';
   static int get pontos => int.tryParse('${utilizador['pontos'] ?? 0}') ?? 0;
+  static int get idArea => int.tryParse('${utilizador['idarea'] ?? 0}') ?? 0;
 }

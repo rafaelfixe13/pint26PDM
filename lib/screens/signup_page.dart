@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 import 'login_page.dart';
 
 class SignUpPage extends StatefulWidget {
@@ -17,6 +18,28 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _verConfirmar = false;
   bool _loading = false;
   String? _erro;
+  
+  List<dynamic> _areas = [];
+  int? _areaSelecionada;
+  bool _carregandoAreas = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarAreas();
+  }
+
+  Future<void> _carregarAreas() async {
+    setState(() => _carregandoAreas = true);
+    try {
+      final areas = await CacheService.getAreas();
+      setState(() => _areas = areas);
+    } catch (e) {
+      print('Erro ao carregar áreas: $e');
+    } finally {
+      setState(() => _carregandoAreas = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -36,6 +59,11 @@ class _SignUpPageState extends State<SignUpPage> {
     // validações
     if (nome.isEmpty || email.isEmpty || password.isEmpty || confirmar.isEmpty) {
       setState(() => _erro = 'Preenche todos os campos');
+      return;
+    }
+
+    if (_areaSelecionada == null) {
+      setState(() => _erro = 'Seleciona uma área');
       return;
     }
 
@@ -60,7 +88,7 @@ class _SignUpPageState extends State<SignUpPage> {
     });
 
     try {
-      await ApiService.registro(nome, email, password);
+      await ApiService.registro(nome, email, password, _areaSelecionada);
 
       // registo bem sucedido — vai para o login
       if (mounted) {
@@ -165,7 +193,68 @@ class _SignUpPageState extends State<SignUpPage> {
 
               SizedBox(height: 16),
 
-              // Password
+              // Área
+              Text('Área de Atuação',
+                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+              SizedBox(height: 8),
+              _carregandoAreas
+                  ? Container(
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Color(0xFF2563EB)),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _areaSelecionada != null
+                              ? Color(0xFF2563EB)
+                              : Colors.grey[300]!,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: DropdownButton<int>(
+                        isExpanded: true,
+                        value: _areaSelecionada,
+                        hint: Padding(
+                          padding: EdgeInsets.only(left: 16),
+                          child: Text(
+                            'Seleciona a tua área',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                        underline: SizedBox.shrink(),
+                        icon: Padding(
+                          padding: EdgeInsets.only(right: 12),
+                          child: Icon(Icons.arrow_drop_down, color: Colors.grey),
+                        ),
+                        onChanged: (value) => setState(() => _areaSelecionada = value),
+                        items: _areas
+                            .map((area) => DropdownMenuItem<int>(
+                                  value: area['idarea'] as int,
+                                  child: Padding(
+                                    padding: EdgeInsets.only(left: 16),
+                                    child: Text(area['nome'] ?? ''),
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+
+              SizedBox(height: 16),
               Text('Password',
                   style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
               SizedBox(height: 8),

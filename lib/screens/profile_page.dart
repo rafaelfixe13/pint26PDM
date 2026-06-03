@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:pinttest/services/session.dart';
-import 'package:pinttest/services/api_service.dart';
-import 'package:pinttest/screens/edit_photo_page.dart';
+import '../../../services/session.dart';
+import '../../../services/api_service.dart';
+import '../../../services/cache_service.dart';
+import '../../../widgets/base64_image_widget.dart';
+import './edit_photo_page.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -23,14 +25,27 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _carregarBadges() async {
     try {
-      final badges = await ApiService.getBadgesDoUtilizador();
+      // Tenta recarregar dados do utilizador da API (inclui pontos atualizados)
+      try {
+        await ApiService.recarregarDadosUtilizador();
+      } catch (e) {
+        debugPrint('Aviso: Não conseguiu recarregar dados do utilizador: $e');
+        // Continua mesmo se não conseguir recarregar pontos
+      }
+
+      final badges = await CacheService.getBadgesDoUtilizador();
       debugPrint('Badges recebidos: $badges');
       debugPrint('Utilizador sessão: ${Session.utilizador}');
       debugPrint('Pontos sessão: ${Session.pontos}');
 
+      // Filtrar apenas badges aprovados
+      final badgesAprovados = badges
+          .where((b) => b['estado'] == 'APPROVED')
+          .toList();
+
       if (!mounted) return;
       setState(() {
-        _badgesConquistados = badges;
+        _badgesConquistados = badgesAprovados;
         _loadingBadges = false;
       });
     } catch (e) {
@@ -53,10 +68,47 @@ class _ProfilePageState extends State<ProfilePage> {
     return texto;
   }
 
+  ImageProvider _getBackgroundImage(String fotoUrl) {
+    if (fotoUrl.isEmpty) {
+      return AssetImage('assets/placeholder.png'); // ou NetworkImage vazio
+    }
+
+    // Se é base64
+    if (Base64ImageWidget.isBase64(fotoUrl)) {
+      try {
+        final imageBytes = Base64ImageWidget.decodeBase64(fotoUrl);
+        return MemoryImage(imageBytes);
+      } catch (e) {
+        debugPrint('Erro ao decodificar base64: $e');
+        return NetworkImage(''); // Fallback para evitar crash
+      }
+    }
+
+    // Se é URL
+    return NetworkImage(fotoUrl);
+  }
+
+  CircleAvatar _getDefaultAvatar({double radius = 50}) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.purple.shade100,
+      child: Icon(
+        Icons.person,
+        color: Colors.purple,
+        size: radius * 0.8,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Session.utilizador;
-    final fotoUrl = Session.fotoUrl.trim();
+    final fotoUrl = Session.fotoUrl
+        .trim()
+        .replaceAll('localhost', '10.0.2.2')
+        .replaceAll('127.0.0.1', '10.0.2.2')
+        .replaceAll('100.105.58.22', '10.0.2.2')
+        .replaceAll('0.0.0.0', '10.0.2.2');
     final totalBadges = _badgesConquistados.length;
     final pontos = Session.pontos;
 
@@ -83,36 +135,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     Stack(
                       children: [
-                        CircleAvatar(
-                          key: _avatarKey,
-                          radius: 50,
-                          backgroundColor: Colors.purple.shade100,
-                          child: ClipOval(
-                            child: fotoUrl.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: fotoUrl,
-                                    width: 100,
-                                    height: 100,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Center(
-                                      child: CircularProgressIndicator(
-                                        color: Colors.purple,
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                    errorWidget: (context, url, error) => Icon(
-                                      Icons.person,
-                                      size: 50,
-                                      color: Colors.purple,
-                                    ),
-                                  )
-                                : Icon(
-                                    Icons.person,
-                                    size: 50,
-                                    color: Colors.purple,
-                                  ),
-                          ),
-                        ),
+                        fotoUrl.isNotEmpty
+                            ? CircleAvatar(
+                                key: _avatarKey,
+                                radius: 50,
+                                backgroundColor: Colors.purple.shade100,
+                                backgroundImage: _getBackgroundImage(fotoUrl),
+                                child: null,
+                              )
+                            : _getDefaultAvatar(radius: 50),
                         Positioned(
                           bottom: 2,
                           right: 2,
@@ -188,9 +219,9 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               SizedBox(height: 8),
               _infoCard(
-                icon: Icons.phone_outlined,
-                title: 'Número de Telefone',
-                value: user['telefone']?.toString() ?? '—',
+                icon: Icons.work_outline,
+                title: 'Área',
+                value: user['area_nome']?.toString() ?? '—',
               ),
               SizedBox(height: 8),
               _infoCard(
@@ -259,7 +290,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   separatorBuilder: (_, __) => SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final badge = _badgesConquistados[index];
-                    final imagem = badge['imagem']?.toString() ?? '';
+                    final imagem = (badge['imagem']?.toString() ?? badge['imagemurl']?.toString() ?? '')
+                        .replaceAll('localhost', '10.0.2.2')
+                        .replaceAll('127.0.0.1', '10.0.2.2')
+                        .replaceAll('100.105.58.22', '10.0.2.2')
+                        .replaceAll('0.0.0.0', '10.0.2.2');
                     final nome = badge['nome']?.toString() ?? 'Badge';
                     final descricao =
                         badge['descricao']?.toString() ?? 'Sem descrição';
@@ -289,8 +324,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(14),
                             child: imagem.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: imagem
+                                ? Base64ImageWidget(
+                                    imageData: imagem
                                         .replaceAll('localhost', '10.0.2.2')
                                         .replaceAll('127.0.0.1', '10.0.2.2')
                                         .replaceAll('100.105.58.22', '10.0.2.2')
@@ -298,7 +333,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     width: 78,
                                     height: 78,
                                     fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(
+                                    placeholder: Container(
                                       width: 78,
                                       height: 78,
                                       color: Colors.grey.shade200,
@@ -309,8 +344,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         ),
                                       ),
                                     ),
-                                    errorWidget: (context, url, error) =>
-                                        Container(
+                                    errorWidget: Container(
                                       width: 78,
                                       height: 78,
                                       color: Colors.blue.shade50,
@@ -337,13 +371,48 @@ class _ProfilePageState extends State<ProfilePage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  nome,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        nome,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade100,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.check,
+                                            color: Colors.green,
+                                            size: 14,
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Aprovado',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.green.shade700,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 SizedBox(height: 6),
                                 Text(

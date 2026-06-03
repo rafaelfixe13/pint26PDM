@@ -1,14 +1,28 @@
 import 'package:flutter/material.dart';
-import 'screens/login_page.dart';
+import 'rotas.dart';
+import 'services/basededados.dart';
+import 'services/session.dart';
+import 'widgets/offline_banner.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Tenta restaurar a sessão guardada localmente
+  final sessaoLocal = await Basededados().obterSessaoLocal();
+  if (sessaoLocal != null) {
+    Session.iniciar(sessaoLocal);
+  }
+
+  // Debug: mostrar o que está em cache
+  await Basededados().debugMostrar();
+
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'Softinsa',
       theme: ThemeData(
@@ -18,7 +32,8 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: LoginPage(),
+      routerConfig: router,
+      builder: (context, child) => OfflineBanner(child: child!),
     );
   }
 }

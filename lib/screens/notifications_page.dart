@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 
 class NotificationsPage extends StatefulWidget {
   @override
@@ -8,6 +9,7 @@ class NotificationsPage extends StatefulWidget {
 
 class _NotificationsPageState extends State<NotificationsPage> {
   late Future<List<dynamic>> _notificacoesFuture;
+  String _sortBy = 'nao_lido'; // 'nao_lido', 'lido', ou 'recente'
 
   @override
   void initState() {
@@ -17,7 +19,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   void _loadData() {
     setState(() {
-      _notificacoesFuture = ApiService.getNotificacoes();
+      _notificacoesFuture = CacheService.getNotificacoes();
     });
   }
 
@@ -34,6 +36,28 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
+  List<dynamic> _sortNotificacoes(List<dynamic> lista) {
+    final sorted = List<dynamic>.from(lista);
+    
+    if (_sortBy == 'nao_lido') {
+      sorted.sort((a, b) {
+        final aLido = a['lido'] == true;
+        final bLido = b['lido'] == true;
+        if (aLido == bLido) return 0;
+        return aLido ? 1 : -1; // Não lidos 
+      });
+    } else if (_sortBy == 'lido') {
+      sorted.sort((a, b) {
+        final aLido = a['lido'] == true;
+        final bLido = b['lido'] == true;
+        if (aLido == bLido) return 0;
+        return aLido ? -1 : 1; // Lidos 
+      });
+    }
+    
+    return sorted;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -48,6 +72,43 @@ class _NotificationsPageState extends State<NotificationsPage> {
         title: Text('Notificações',
             style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         actions: [
+          PopupMenuButton<String>(
+            initialValue: _sortBy,
+            onSelected: (value) {
+              setState(() {
+                _sortBy = value;
+              });
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'nao_lido',
+                child: Row(
+                  children: [
+                    if (_sortBy == 'nao_lido')
+                      Icon(Icons.check, size: 18, color: Color(0xFF2563EB))
+                    else
+                      SizedBox(width: 24),
+                    SizedBox(width: 8),
+                    Text('Não Lidos'),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'lido',
+                child: Row(
+                  children: [
+                    if (_sortBy == 'lido')
+                      Icon(Icons.check, size: 18, color: Color(0xFF2563EB))
+                    else
+                      SizedBox(width: 24),
+                    SizedBox(width: 8),
+                    Text('Lidos'),
+                  ],
+                ),
+              ),
+            ],
+            icon: Icon(Icons.sort, color: Colors.black87),
+          ),
           TextButton(
             onPressed: () async {
               await ApiService.marcarTodasLidas();
@@ -99,13 +160,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
               );
             }
 
+            final listaOrdenada = _sortNotificacoes(lista);
+
             return ListView.separated(
               physics: AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.symmetric(vertical: 8),
-              itemCount: lista.length,
+              itemCount: listaOrdenada.length,
               separatorBuilder: (_, __) => Divider(height: 1, indent: 16, endIndent: 16),
               itemBuilder: (context, index) {
-                final n = lista[index];
+                final n = listaOrdenada[index];
                 final bool lida = n['lido'] == true;
                 final int id = n['idnotificacao'];
 

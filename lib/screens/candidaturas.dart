@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pinttest/services/api_service.dart';
-import 'package:pinttest/screens/badge_detail_page.dart';
+import 'package:go_router/go_router.dart';
+import '../services/cache_service.dart';
+import '../widgets/base64_image_widget.dart';
 
 class CandidaturasPage extends StatefulWidget {
   const CandidaturasPage({super.key});
@@ -15,12 +16,12 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
   @override
   void initState() {
     super.initState();
-    _candidaturasFuture = ApiService.getCandidaturas();
+    _candidaturasFuture = CacheService.getCandidaturas();
   }
 
   Future<void> _recarregar() async {
     setState(() {
-      _candidaturasFuture = ApiService.getCandidaturas();
+      _candidaturasFuture = CacheService.getCandidaturas();
     });
     await _candidaturasFuture;
   }
@@ -68,12 +69,7 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
   }
 
   void _abrirBadge(dynamic candidatura) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BadgeDetailPage(badge: candidatura),
-      ),
-    );
+    context.go('/badge_detail', extra: {'badge': candidatura, 'candidatura': candidatura});
   }
 
   Widget _buildEstadoChip(String estado) {
@@ -97,17 +93,22 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
   }
 
   Widget _buildImagemBadge(dynamic candidatura) {
-    final imagemUrl = candidatura['imagemurl']?.toString();
+    final imagemUrl = candidatura['imagemurl']?.toString()
+        .replaceAll('localhost', '10.0.2.2')
+        .replaceAll('127.0.0.1', '10.0.2.2')
+        .replaceAll('100.105.58.22', '10.0.2.2')
+        .replaceAll('0.0.0.0', '10.0.2.2');
 
     if (imagemUrl != null && imagemUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          imagemUrl,
+        child: Base64ImageWidget(
+          imageData: imagemUrl,
           width: 56,
           height: 56,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          borderRadius: BorderRadius.circular(11),
+          errorWidget: Container(
             width: 56,
             height: 56,
             decoration: BoxDecoration(
@@ -146,7 +147,10 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => context.go('/main'),
+        ),
         title: const Text(
           'Candidaturas',
           style: TextStyle(
@@ -229,18 +233,10 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
                 final estado = candidatura['estado']?.toString() ?? 'OPEN';
                 final nome = candidatura['nome']?.toString() ?? 'Badge';
                 final descricao = candidatura['descricao']?.toString() ?? '';
-                final comentario = candidatura['comentariogeral']?.toString() ?? '';
-                final nivel = candidatura['nivel']?.toString() ?? 'N/A';
+                final comentario =
+                    candidatura['comentariogeral']?.toString() ?? '';
+                final nivel = candidatura['idnivel']?.toString() ?? 'N/A';
                 final pontos = candidatura['pontos']?.toString() ?? '0';
-                final atual = int.tryParse(
-                      candidatura['progresso_atual']?.toString() ?? '0',
-                    ) ??
-                    0;
-                final total = int.tryParse(
-                      candidatura['progresso_total']?.toString() ?? '0',
-                    ) ??
-                    0;
-                final progresso = total > 0 ? (atual / total).clamp(0.0, 1.0) : 0.0;
                 final data = _formatarData(
                   candidatura['datasubmissao'] ?? candidatura['datacriacao'],
                 );
@@ -328,33 +324,6 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
                                   ),
                                 ),
                               ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Progresso',
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                Text(
-                                  '$atual/$total',
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            LinearProgressIndicator(
-                              value: progresso,
-                              backgroundColor: const Color(0xFFE5E7EB),
-                              color: const Color(0xFF2563EB),
-                              minHeight: 6,
                             ),
                             if (comentario.isNotEmpty) ...[
                               const SizedBox(height: 14),

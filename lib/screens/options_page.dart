@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pinttest/screens/change_password.dart';
-import 'package:pinttest/services/api_service.dart';
-import 'package:pinttest/services/session.dart';
+import 'package:go_router/go_router.dart';
+import '../services/api_service.dart';
+import '../services/session.dart';
 
 class OptionsPage extends StatefulWidget {
   const OptionsPage({super.key});
@@ -74,7 +74,10 @@ class _OptionsPageState extends State<OptionsPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
+          onPressed: () => context.go('/main'),
+        ),
         title: const Text(
           'Opções',
           style: TextStyle(
@@ -125,14 +128,7 @@ class _OptionsPageState extends State<OptionsPage> {
           _actionButton(
             icon: '🔑',
             text: 'Alterar palavra-passe',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChangePasswordPage(),
-                ),
-              );
-            },
+            onTap: () => context.go('/change-password'),
           ),
 
           const SizedBox(height: 24),

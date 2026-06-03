@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../services/api_service.dart';
+import '../services/cache_service.dart';
 import '../services/session.dart';
+import '../widgets/base64_image_widget.dart';
+import 'package:go_router/go_router.dart';
 
 class RankingPage extends StatefulWidget {
+  const RankingPage({super.key});
   @override
   State<RankingPage> createState() => _RankingPageState();
 }
@@ -14,7 +16,7 @@ class _RankingPageState extends State<RankingPage> {
   @override
   void initState() {
     super.initState();
-    _rankingFuture = ApiService.getRanking();
+    _rankingFuture = CacheService.getRanking();
   }
 
   @override
@@ -26,7 +28,9 @@ class _RankingPageState extends State<RankingPage> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            context.go('/main');
+          },
         ),
         title: Text(
           'Ranking',
@@ -46,7 +50,42 @@ class _RankingPageState extends State<RankingPage> {
             return Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
-            return Center(child: Text('Erro ao carregar ranking'));
+            return Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    SizedBox(height: 16),
+                    Text(
+                      'Erro ao carregar ranking',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '${snap.error}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _rankingFuture = CacheService.getRanking();
+                        });
+                      },
+                      icon: Icon(Icons.refresh),
+                      label: Text('Tentar Novamente'),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           final lista = snap.data ?? [];
@@ -128,24 +167,21 @@ class _RankingPageState extends State<RankingPage> {
                         BorderRadius.vertical(top: Radius.circular(24)),
                   ),
                   child: ListView.separated(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: resto.length,
                     separatorBuilder: (_, __) => Divider(height: 1),
                     itemBuilder: (context, i) {
                       final u = resto[i];
                       final posicao = i + 4;
-                      final isYou = u['idutilizador'].toString() ==
-                          Session.id.toString();
+                      final isYou =
+                          u['idutilizador'].toString() == Session.id.toString();
 
                       return Container(
                         margin: EdgeInsets.symmetric(vertical: 4),
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
-                          color: isYou
-                              ? Color(0xFF2563EB)
-                              : Colors.white,
+                          color: isYou ? Color(0xFF2563EB) : Colors.white,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
@@ -163,9 +199,7 @@ class _RankingPageState extends State<RankingPage> {
                                 isYou ? 'You' : (u['nome'] ?? ''),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w500,
-                                  color: isYou
-                                      ? Colors.white
-                                      : Colors.black87,
+                                  color: isYou ? Colors.white : Colors.black87,
                                 ),
                               ),
                             ),
@@ -194,9 +228,7 @@ class _RankingPageState extends State<RankingPage> {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
-                                color: isYou
-                                    ? Colors.white
-                                    : Colors.black87,
+                                color: isYou ? Colors.white : Colors.black87,
                               ),
                             ),
                           ],
@@ -242,9 +274,6 @@ class _TopCard extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        if (showCrown)
-          Text('👑', style: TextStyle(fontSize: 28)),
-
         Stack(
           alignment: Alignment.center,
           children: [
@@ -285,9 +314,7 @@ class _TopCard extends StatelessWidget {
             ),
           ],
         ),
-
         SizedBox(height: 6),
-
         Text(
           isCurrentUser ? 'You' : (utilizador['nome'] ?? ''),
           style: TextStyle(
@@ -299,7 +326,6 @@ class _TopCard extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-
         Text(
           '${utilizador['pontos'] ?? 0}',
           style: TextStyle(
@@ -330,21 +356,38 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = fotoUrl?.toString() ?? '';
 
+    if (url.isEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.purple.shade100,
+        child: Icon(Icons.person, size: radius, color: Colors.purple),
+      );
+    }
+
+    if (Base64ImageWidget.isBase64(url)) {
+      try {
+        final imageBytes = Base64ImageWidget.decodeBase64(url);
+        return CircleAvatar(
+          radius: radius,
+          backgroundColor: Colors.purple.shade100,
+          backgroundImage: MemoryImage(imageBytes),
+          child: null,
+        );
+      } catch (e) {
+        return CircleAvatar(
+          radius: radius,
+          backgroundColor: Colors.red.shade100,
+          child: Icon(Icons.error, size: radius * 0.6),
+        );
+      }
+    }
+
     return CircleAvatar(
       radius: radius,
       backgroundColor: Colors.purple.shade100,
-      child: ClipOval(
-        child: url.isNotEmpty
-            ? CachedNetworkImage(
-                imageUrl: url,
-                width: radius * 2,
-                height: radius * 2,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) =>
-                    Icon(Icons.person, size: radius, color: Colors.purple),
-              )
-            : Icon(Icons.person, size: radius, color: Colors.purple),
-      ),
+      backgroundImage: NetworkImage(url),
+      onBackgroundImageError: (exception, stackTrace) {},
+      child: null,
     );
   }
 }
