@@ -4,6 +4,7 @@ import '../../../services/session.dart';
 import '../../../services/api_service.dart';
 import '../../../services/cache_service.dart';
 import '../../../services/milestone_service.dart';
+import '../../../services/expiracao_service.dart';
 import '../../../widgets/base64_image_widget.dart';
 import './edit_photo_page.dart';
 
@@ -450,6 +451,29 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ),
                                   ],
                                 ),
+                                // Expiração do badge
+                                Builder(builder: (_) {
+                                  final expList = ExpiracaoService.calcular([badge]);
+                                  if (expList.isEmpty) return const SizedBox.shrink();
+                                  final exp = expList.first;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 6, bottom: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          exp.expirado ? Icons.error_outline : Icons.access_time_outlined,
+                                          size: 14,
+                                          color: exp.cor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          exp.etiqueta,
+                                          style: TextStyle(fontSize: 11, color: exp.cor, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
                                 SizedBox(height: 8),
                                 LinearProgressIndicator(
                                   value: progressoTotal > 0

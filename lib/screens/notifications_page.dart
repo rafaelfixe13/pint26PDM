@@ -213,6 +213,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              if ((n['titulo'] as String?)?.isNotEmpty == true)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 3),
+                                  child: Text(
+                                    n['titulo'],
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
                               Text(
                                 n['mensagem'] ?? '',
                                 style: TextStyle(

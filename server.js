@@ -553,7 +553,8 @@ app.get("/utilizadores/:id/candidaturas", async (req, res) => {
         b.pontos,
         b.linkpublicobase,
         b.competencias,
-        b.certificado
+        b.certificado,
+        b.expiremeses
       FROM candidaturasbadge cb
       INNER JOIN badges b ON b.idbadge = cb.badge_id
       WHERE cb.user_id = $1
@@ -1163,6 +1164,93 @@ app.delete("/notificacoes/:id", async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error("Erro ao apagar notificação:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// NOTIFICAÇÕES DE EXPIRAÇÃO DE BADGES
+// POST /utilizadores/:id/notificacoes-expiracao
+// Cria notificações para candidaturas SUBMITTED prestes a expirar.
+// Deduplica: 1 notificação por badge por dia.
+// ─────────────────────────────────────────────────────────
+app.get('/debug/notificacoes-schema', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_name = 'notificacoes'
+      ORDER BY ordinal_position
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/utilizadores/:id/notificacoes-expiracao', async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (isNaN(userId)) return res.status(400).json({ error: 'ID inválido' });
+
+  try {
+    const { rows: candidaturas } = await pool.query(`
+      SELECT cb.idcandidatura, cb.datasubmissao, b.nome, b.expiremeses, b.idbadge
+      FROM candidaturasbadge cb
+      INNER JOIN badges b ON b.idbadge = cb.badge_id
+      WHERE cb.user_id = $1
+        AND cb.estado = 'SUBMITTED'
+        AND b.expiremeses IS NOT NULL
+        AND b.expiremeses > 0
+    `, [userId]);
+
+    const hoje = new Date();
+    let criadas = 0;
+
+    for (const cand of candidaturas) {
+      const dataSubmissao = new Date(cand.datasubmissao);
+      const dataExpiracao = new Date(dataSubmissao);
+      dataExpiracao.setMonth(dataExpiracao.getMonth() + parseInt(cand.expiremeses));
+
+      const diasRestantes = Math.floor((dataExpiracao - hoje) / (1000 * 60 * 60 * 24));
+
+      // Só alerta se expirar nos próximos 30 dias ou já expirou
+      if (diasRestantes > 30) continue;
+
+      // Deduplicação: não criar se já existe notificação deste badge nas últimas 24h
+      const { rows: existing } = await pool.query(`
+        SELECT 1 FROM notificacoes
+        WHERE idutilizador = $1
+          AND mensagem LIKE $2
+          AND dataenvio >= NOW() - INTERVAL '1 day'
+        LIMIT 1
+      `, [userId, `%${cand.nome}%expi%`]);
+
+      if (existing.length > 0) continue;
+
+      let mensagem;
+      if (diasRestantes < 0) {
+        mensagem = `⚠️ A tua candidatura ao badge "${cand.nome}" expirou há ${-diasRestantes} dia(s). Submete novamente para manteres o progresso.`;
+      } else if (diasRestantes === 0) {
+        mensagem = `⏰ A tua candidatura ao badge "${cand.nome}" expira hoje! Renova a tua candidatura.`;
+      } else {
+        mensagem = `⏰ A tua candidatura ao badge "${cand.nome}" expira em ${diasRestantes} dia(s). Não percas o prazo!`;
+      }
+
+      const titulo = diasRestantes < 0
+        ? '⚠️ Badge Expirado'
+        : '⏰ Badge a Expirar';
+
+      await pool.query(`
+        INSERT INTO notificacoes (idutilizador, titulo, mensagem, lido, dataenvio, tipo)
+        VALUES ($1, $2, $3, FALSE, NOW(), 'PUSH')
+      `, [userId, titulo, mensagem]);
+
+      criadas++;
+    }
+
+    res.json({ success: true, criadas });
+  } catch (err) {
+    console.error('Erro ao criar notificações de expiração:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

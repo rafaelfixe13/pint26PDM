@@ -539,6 +539,15 @@ class ApiService {
     }
   }
 
+  static Future<void> verificarExpiracaoNotificacoes(int userId) async {
+    try {
+      await _post(
+        Uri.parse('$baseUrl/utilizadores/$userId/notificacoes-expiracao'),
+        headers: {'Accept': 'application/json'},
+      );
+    } catch (_) {}
+  }
+
   static Future<List<dynamic>> getRequisitosBadge(int badgeId) async {
     final response = await _get(
       Uri.parse('$baseUrl/badges/$badgeId/requisitos'),

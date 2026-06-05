@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/session.dart';
 import '../widgets/base64_image_widget.dart';
+import '../services/api_service.dart';
 import '../services/cache_service.dart';
 import '../services/lembretes_service.dart';
 import '../services/milestone_service.dart';
+import '../services/expiracao_service.dart';
 import '../widgets/milestone_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'notifications_page.dart';
@@ -33,7 +35,81 @@ class _MainPageState extends State<MainPage> {
       Future.delayed(const Duration(milliseconds: 1200), () {
         if (mounted) _verificarMarcos();
       });
+      Future.delayed(const Duration(milliseconds: 1800), () {
+        if (mounted) _verificarExpiracao();
+      });
     });
+  }
+
+  Future<void> _verificarExpiracao() async {
+    if (Session.expiracaoVerificada) return;
+    Session.expiracaoVerificada = true;
+    try {
+      // Cria notificações no servidor para badges a expirar
+      await ApiService.verificarExpiracaoNotificacoes(Session.id);
+      final candidaturas = await CacheService.getCandidaturas();
+      final expirando = ExpiracaoService.calcular(candidaturas);
+      if (expirando.isEmpty || !mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(children: [
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B)),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text('Badges a Expirar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+          ]),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: expirando.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, i) {
+                final b = expirando[i];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(b.nome, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${b.dataExpiracao.day.toString().padLeft(2,'0')}/${b.dataExpiracao.month.toString().padLeft(2,'0')}/${b.dataExpiracao.year}',
+                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: b.cor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(b.etiqueta, style: TextStyle(fontSize: 11, color: b.cor, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+              child: const Text('OK', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {}
   }
 
   Future<void> _verificarMarcos() async {
