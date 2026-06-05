@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../services/session.dart';
 import '../../../services/api_service.dart';
 import '../../../services/cache_service.dart';
+import '../../../services/milestone_service.dart';
 import '../../../widgets/base64_image_widget.dart';
 import './edit_photo_page.dart';
 
@@ -16,11 +17,18 @@ class _ProfilePageState extends State<ProfilePage> {
 
   List<dynamic> _badgesConquistados = [];
   bool _loadingBadges = true;
+  List<Map<String, dynamic>> _marcos = [];
 
   @override
   void initState() {
     super.initState();
     _carregarBadges();
+    _carregarMarcos();
+  }
+
+  Future<void> _carregarMarcos() async {
+    final lista = await MilestoneService.listarCelebrados();
+    if (mounted) setState(() => _marcos = lista);
   }
 
   Future<void> _carregarBadges() async {
@@ -491,6 +499,74 @@ class _ProfilePageState extends State<ProfilePage> {
                   _statCard('Pontos totais obtidos', '$pontos'),
                 ],
               ),
+
+              SizedBox(height: 24),
+
+              // ── Marcos Alcançados ──
+              if (_marcos.isNotEmpty) ...[
+                Text(
+                  'Marcos Alcançados',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '${_marcos.length} marco${_marcos.length == 1 ? '' : 's'} conquistado${_marcos.length == 1 ? '' : 's'}',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                SizedBox(height: 12),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 1.55,
+                  ),
+                  itemCount: _marcos.length,
+                  itemBuilder: (context, i) {
+                    final marco = _marcos[i]['milestone'] as Milestone;
+                    final data = _marcos[i]['celebrado_em'] as String;
+                    final dataFormatada = data.length >= 10 ? data.substring(0, 10) : data;
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF1E3A5F), Color(0xFF2563EB)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(marco.emoji, style: const TextStyle(fontSize: 26)),
+                          const Spacer(),
+                          Text(
+                            marco.titulo,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            dataFormatada,
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
 
               SizedBox(height: 32),
             ],

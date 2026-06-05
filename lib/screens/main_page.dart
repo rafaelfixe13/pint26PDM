@@ -3,6 +3,8 @@ import '../services/session.dart';
 import '../widgets/base64_image_widget.dart';
 import '../services/cache_service.dart';
 import '../services/lembretes_service.dart';
+import '../services/milestone_service.dart';
+import '../widgets/milestone_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'notifications_page.dart';
 import 'profile_page.dart';
@@ -28,7 +30,25 @@ class _MainPageState extends State<MainPage> {
       Future.delayed(const Duration(milliseconds: 600), () {
         if (mounted) _verificarLembretes();
       });
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted) _verificarMarcos();
+      });
     });
+  }
+
+  Future<void> _verificarMarcos() async {
+    if (Session.marcosVerificados) return;
+    Session.marcosVerificados = true;
+    try {
+      final candidaturas = await CacheService.getCandidaturas();
+      final novos = await MilestoneService.verificarNovos(candidaturas);
+      if (novos.isEmpty || !mounted) return;
+      for (final marco in novos) {
+        if (!mounted) break;
+        await MilestoneDialog.mostrar(context, marco);
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+    } catch (_) {}
   }
 
   Future<void> _verificarLembretes() async {

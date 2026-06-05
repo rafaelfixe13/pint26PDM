@@ -19,7 +19,7 @@ class Basededados {
     final path = join(await getDatabasesPath(), 'softinsa_cache.db');
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -78,6 +78,7 @@ class Basededados {
     ''');
 
     await _criarTabelaLembretes(db);
+    await _criarTabelaMarcos(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -89,6 +90,20 @@ class Basededados {
         'ALTER TABLE lembretes ADD COLUMN utilizador_id INTEGER NOT NULL DEFAULT 0',
       );
     }
+    if (oldVersion < 4) {
+      await _criarTabelaMarcos(db);
+    }
+  }
+
+  Future<void> _criarTabelaMarcos(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS marcos_celebrados (
+        id TEXT NOT NULL,
+        utilizador_id INTEGER NOT NULL,
+        celebrado_em TEXT,
+        PRIMARY KEY (id, utilizador_id)
+      )
+    ''');
   }
 
   Future<void> _criarTabelaLembretes(Database db) async {
