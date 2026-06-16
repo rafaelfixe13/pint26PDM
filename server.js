@@ -6,6 +6,46 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { createCanvas, loadImage } = require('canvas');
+require('dotenv').config();
+const nodemailer = require('nodemailer');
+
+// ─────────────────────────────────────────────────────────
+// CONFIGURAÇÃO DO SMTP (usar variáveis de ambiente em .env)
+// ─────────────────────────────────────────────────────────
+const smtpConfig = {
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '465', 10),
+  secure: (process.env.SMTP_SECURE || 'true') === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+};
+
+if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
+  console.warn('SMTP credentials not set. Set SMTP_USER and SMTP_PASS in your .env');
+}
+
+const mailTransporter = nodemailer.createTransport(smtpConfig);
+
+async function sendCandidaturaConfirmation(email, nome, badgeNome, idCandidatura) {
+  if (!email) return;
+
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || 'no-reply@example.com',
+    to: email,
+    subject: `Confirmação de submissão da candidatura #${idCandidatura}`,
+    text: `Olá ${nome || ''},\n\nRecebemos a sua candidatura para o badge "${badgeNome}". O ID da candidatura é ${idCandidatura}.\n\nObrigado,\nEquipa PINT`,
+    html: `<p>Olá ${nome || ''},</p><p>Recebemos a sua candidatura para o badge "<strong>${badgeNome}</strong>".</p><p><strong>ID da candidatura:</strong> ${idCandidatura}</p><p>Obrigado,<br/>Equipa PINT</p>`,
+  };
+
+  try {
+    await mailTransporter.sendMail(mailOptions);
+    console.log('Email de confirmação enviado para', email);
+  } catch (err) {
+    console.error('Erro ao enviar email de confirmação:', err.message);
+  }
+}
 
 const app = express();
 app.use(cors());
@@ -704,6 +744,29 @@ app.post("/candidaturas", upload.any(), async (req, res) => {
     );
 
     await client.query("COMMIT");
+
+    // Enviar email de confirmação em background (fire-and-forget)
+    (async () => {
+      try {
+        const userResult = await pool.query(
+          'SELECT nome, email FROM utilizadores WHERE idutilizador = $1',
+          [userId]
+        );
+
+        const badgeResult = await pool.query(
+          'SELECT nome FROM badges WHERE idbadge = $1',
+          [badgeId]
+        );
+
+        const userEmail = userResult.rows[0]?.email;
+        const userNome = userResult.rows[0]?.nome;
+        const badgeNome = badgeResult.rows[0]?.nome;
+
+        sendCandidaturaConfirmation(userEmail, userNome, badgeNome, idCandidatura);
+      } catch (emailErr) {
+        console.error('Erro ao preparar envio de email:', emailErr.message);
+      }
+    })();
 
     res.status(200).json({
       success: true,
