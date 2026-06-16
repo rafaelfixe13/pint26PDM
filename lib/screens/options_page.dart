@@ -149,19 +149,33 @@ class _OptionsPageState extends State<OptionsPage> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-            child: SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text(
-                'Aceitar os termos RGPD',
-                style: TextStyle(fontSize: 15),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                switchTheme: SwitchThemeData(
+                  thumbColor: WidgetStateProperty.resolveWith((states) =>
+                      states.contains(WidgetState.selected)
+                          ? Colors.white
+                          : Colors.grey.shade500),
+                  trackColor: WidgetStateProperty.resolveWith((states) =>
+                      states.contains(WidgetState.selected)
+                          ? const Color(0xFF6B9FD4)
+                          : Colors.grey.shade300),
+                  trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                ),
               ),
-              subtitle: const Text(
-                'Autoriza o tratamento dos teus dados conforme a política de privacidade.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'Aceitar os termos RGPD',
+                  style: TextStyle(fontSize: 15),
+                ),
+                subtitle: const Text(
+                  'Autoriza o tratamento dos teus dados conforme a política de privacidade.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                value: _rgpd,
+                onChanged: _aGuardarRgpd ? null : _atualizarRgpd,
               ),
-              value: _rgpd,
-              onChanged: _aGuardarRgpd ? null : _atualizarRgpd,
-              activeColor: const Color(0xFF3F6AA3),
             ),
           ),
 
@@ -204,16 +218,26 @@ class _OptionsPageState extends State<OptionsPage> {
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(
-          text,
-          style: const TextStyle(fontSize: 15),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          switchTheme: SwitchThemeData(
+            thumbColor: WidgetStateProperty.resolveWith((states) =>
+                states.contains(WidgetState.selected)
+                    ? Colors.white
+                    : Colors.grey.shade500),
+            trackColor: WidgetStateProperty.resolveWith((states) =>
+                states.contains(WidgetState.selected)
+                    ? const Color(0xFF6B9FD4)
+                    : Colors.grey.shade300),
+            trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+          ),
         ),
-        value: value,
-        onChanged: onChanged,
-        activeColor: const Color(0xFF9DBCF2),
-        activeTrackColor: const Color(0xFF9DBCF2),
+        child: SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(text, style: const TextStyle(fontSize: 15)),
+          value: value,
+          onChanged: onChanged,
+        ),
       ),
     );
   }

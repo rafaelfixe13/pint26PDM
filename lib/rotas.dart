@@ -14,6 +14,7 @@ import 'screens/options_page.dart';
 import 'screens/change_password.dart';
 import 'screens/lembretes_page.dart';
 import 'screens/calendario_page.dart';
+import 'screens/dashboard_page.dart';
 
 final GoRouter router = GoRouter(
   initialLocation: '/',
@@ -90,6 +91,10 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/calendario',
       builder: (context, state) => const CalendarioPage(),
+    ),
+    GoRoute(
+      path: '/dashboard',
+      builder: (context, state) => const DashboardPage(),
     ),
   ],
 );

@@ -23,6 +23,7 @@ class _MainPageState extends State<MainPage> {
   late Future<List<dynamic>> _candidaturasFuture;
   late Future<List<dynamic>> _notificacoesFuture;
   late Future<List<Map<String, dynamic>>> _lembretesFuture;
+  late Future<Map<String, dynamic>?> _dashboardFuture;
 
   @override
   void initState() {
@@ -214,6 +215,7 @@ class _MainPageState extends State<MainPage> {
     _candidaturasFuture = CacheService.getCandidaturas();
     _notificacoesFuture = CacheService.getNotificacoes();
     _lembretesFuture = LembretesService.verificarProximos(diasAntecedencia: 7);
+    _dashboardFuture = ApiService.getDashboard().catchError((_) => <String, dynamic>{});
     if (mounted) setState(() {});
   }
 
@@ -477,107 +479,110 @@ class _MainPageState extends State<MainPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Card de Meta - Design Novo
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(0xFFE5E7EB),
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.06),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
+                          // Card de Meta
+                          FutureBuilder<Map<String, dynamic>?>(
+                            future: _dashboardFuture,
+                            builder: (context, dashSnap) {
+                              final dash = dashSnap.data ?? {};
+                              final progresso = dash['progresso'] as Map<String, dynamic>? ?? {};
+                              final aprovados = (progresso['badges_aprovados'] as num?)?.toInt() ?? 0;
+                              final total = (progresso['total_badges'] as num?)?.toInt() ?? 0;
+                              final pct = total > 0 ? (aprovados / total).clamp(0.0, 1.0) : 0.0;
+                              return Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.06),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        const Text(
-                                          'A tua Meta',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                            color: Color(0xFF999999),
-                                            letterSpacing: 0.5,
-                                          ),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'A tua Meta',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                                color: Color(0xFF999999),
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              '$aprovados de $total Badges',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 22,
+                                                color: Color(0xFF1E3A5F),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        const SizedBox(height: 6),
-                                        const Text(
-                                          '5 de 10 Badges',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 22,
-                                            color: Color(0xFF1E3A5F),
+                                        Container(
+                                          width: 64,
+                                          height: 64,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF0052CC).withOpacity(0.1),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              '${(pct * 100).toInt()}%',
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFF0052CC),
+                                              ),
+                                            ),
                                           ),
                                         ),
                                       ],
                                     ),
-                                    Container(
-                                      width: 64,
-                                      height: 64,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF0052CC)
-                                            .withOpacity(0.1),
-                                        shape: BoxShape.circle,
+                                    const SizedBox(height: 16),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: LinearProgressIndicator(
+                                        value: pct,
+                                        backgroundColor: const Color(0xFFE5E7EB),
+                                        color: const Color(0xFF0052CC),
+                                        minHeight: 6,
                                       ),
-                                      child: Center(
-                                        child: Text(
-                                          '50%',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w800,
-                                            color: const Color(0xFF0052CC),
-                                          ),
-                                        ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(
+                                        children: (listaBadges.isEmpty
+                                                ? List.filled(5, null)
+                                                : listaBadges)
+                                            .take(5)
+                                            .map<Widget>(
+                                              (b) => Padding(
+                                                padding: const EdgeInsets.only(right: 10),
+                                                child: _buildBadgeAvatar(b),
+                                              ),
+                                            )
+                                            .toList(),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: LinearProgressIndicator(
-                                    value: 0.5,
-                                    backgroundColor: const Color(0xFFE5E7EB),
-                                    color: const Color(0xFF0052CC),
-                                    minHeight: 6,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: (listaBadges.isEmpty
-                                            ? List.filled(5, null)
-                                            : listaBadges)
-                                        .take(5)
-                                        .map<Widget>(
-                                          (b) => Padding(
-                                            padding: const EdgeInsets.only(
-                                                right: 10),
-                                            child: _buildBadgeAvatar(b),
-                                          ),
-                                        )
-                                        .toList(),
-                                  ),
-                                ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
 
                           const SizedBox(height: 32),
@@ -683,29 +688,33 @@ class _MainPageState extends State<MainPage> {
                             ),
                           ),
                           const SizedBox(height: 14),
-                          if (candidaturas.isEmpty)
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 24),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
-                              ),
-                              child: const Column(
-                                children: [
-                                  Icon(Icons.inbox_outlined, size: 36, color: Color(0xFFB0B8C1)),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Sem candidaturas em progresso',
-                                    style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            Row(
-                              children: candidaturas
+                          Builder(builder: (context) {
+                            final emProgresso = candidaturas
+                                .where((c) => c['estado'] != 'APPROVED')
+                                .toList();
+                            if (emProgresso.isEmpty) {
+                              return Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 24),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
+                                ),
+                                child: const Column(
+                                  children: [
+                                    Icon(Icons.inbox_outlined, size: 36, color: Color(0xFFB0B8C1)),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'Sem candidaturas em progresso',
+                                      style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            return Row(
+                              children: emProgresso
                                   .take(2)
                                   .map<Widget>(
                                     (c) => Expanded(
@@ -726,7 +735,8 @@ class _MainPageState extends State<MainPage> {
                                     ),
                                   )
                                   .toList(),
-                            ),
+                            );
+                          }),
 
                           const SizedBox(height: 32),
 
@@ -977,6 +987,11 @@ class _MainPageState extends State<MainPage> {
                     onTap: () => context.go('/badges'),
                   ),
                   _drawerItem(
+                    Icons.route_outlined,
+                    'Learning Path',
+                    onTap: () => context.go('/dashboard'),
+                  ),
+                  _drawerItem(
                     Icons.bar_chart_outlined,
                     'Ranking',
                     onTap: () => context.go('/ranking'),
@@ -1203,15 +1218,6 @@ class _MainPageState extends State<MainPage> {
                 backgroundColor: const Color(0xFFE5E7EB),
                 color: const Color(0xFF0052CC),
                 minHeight: 4,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              '10 dias restantes',
-              style: TextStyle(
-                fontSize: 9,
-                color: Color(0xFF999999),
-                fontWeight: FontWeight.w500,
               ),
             ),
           ],

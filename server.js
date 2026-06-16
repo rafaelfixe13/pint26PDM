@@ -1421,6 +1421,196 @@ app.post('/badges/:id/generate-image', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────
+// DASHBOARD — Learning Path Progress
+// GET /utilizadores/:id/dashboard
+// ─────────────────────────────────────────────────────────
+app.get('/utilizadores/:id/dashboard', async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (isNaN(userId)) return res.status(400).json({ error: 'ID inválido' });
+
+  try {
+    const lpRes = await pool.query(
+      `SELECT nome FROM learningpaths WHERE ativo = TRUE ORDER BY idlearningpath ASC LIMIT 1`
+    );
+    const learningPathNome = lpRes.rows[0]?.nome ?? 'Jornada Técnica';
+
+    // Contagem global: total de badges ativos e aprovados pelo utilizador
+    const countRes = await pool.query(`
+      SELECT
+        COUNT(b.idbadge)::int                                  AS total,
+        COUNT(b.idbadge) FILTER (WHERE cb.estado = 'APPROVED')::int AS aprovados
+      FROM badges b
+      LEFT JOIN candidaturasbadge cb
+             ON cb.badge_id = b.idbadge AND cb.user_id = $1
+      WHERE b.ativo = TRUE
+    `, [userId]);
+    const totalBadges   = countRes.rows[0]?.total    ?? 0;
+    const badgesAprovados = countRes.rows[0]?.aprovados ?? 0;
+
+    // CTE em dois passos para evitar o problema DISTINCT + ROW_NUMBER():
+    // 1) distinct_niveis: pares (area, nivel) únicos
+    // 2) nivel_rank: aplica ROW_NUMBER() sobre esses pares únicos → 1=A, 2=B...
+    const { rows } = await pool.query(`
+      WITH distinct_niveis AS (
+        SELECT DISTINCT a.idarea, n.idnivel
+        FROM areas  a
+        INNER JOIN badges b ON b.idarea  = a.idarea   AND b.ativo = TRUE
+        INNER JOIN nivel  n ON n.idnivel = b.idnivel
+        WHERE a.ativo = TRUE
+      ),
+      nivel_rank AS (
+        SELECT
+          sl.idserviceline,
+          sl.nome                                              AS serviceline_nome,
+          a.idarea,
+          a.nome                                               AS area_nome,
+          dn.idnivel,
+          n.nome                                               AS nivel_nome,
+          ROW_NUMBER() OVER (
+            PARTITION BY a.idarea ORDER BY dn.idnivel ASC
+          )                                                    AS pos
+        FROM distinct_niveis dn
+        INNER JOIN areas       a  ON a.idarea       = dn.idarea
+        INNER JOIN serviceline sl ON sl.idserviceline = a.idserviceline AND sl.ativo = TRUE
+        INNER JOIN nivel       n  ON n.idnivel       = dn.idnivel
+      )
+      SELECT
+        nr.idserviceline,
+        nr.serviceline_nome,
+        nr.idarea,
+        nr.area_nome,
+        CHR(64 + nr.pos::int)                                  AS nivel_grupo,
+        nr.nivel_nome,
+        COUNT(DISTINCT b.idbadge)::int                         AS total_badges,
+        COUNT(DISTINCT b.idbadge) FILTER (
+          WHERE cb.estado = 'APPROVED'
+        )::int                                                 AS badges_aprovados,
+        CASE
+          WHEN COUNT(b.idbadge) FILTER (WHERE cb.estado = 'APPROVED') > 0
+            THEN 'APPROVED'
+          WHEN COUNT(b.idbadge) FILTER (
+            WHERE cb.estado IN ('SUBMITTED','UNDER_REVIEW')
+          ) > 0 THEN 'SUBMITTED'
+          WHEN COUNT(b.idbadge) FILTER (WHERE cb.estado = 'OPEN') > 0
+            THEN 'OPEN'
+          ELSE 'NAO_INICIADO'
+        END                                                    AS estado
+      FROM nivel_rank nr
+      INNER JOIN badges b ON b.idarea = nr.idarea AND b.idnivel = nr.idnivel AND b.ativo = TRUE
+      LEFT  JOIN candidaturasbadge cb
+             ON cb.badge_id = b.idbadge AND cb.user_id = $1
+      WHERE nr.pos <= 5
+      GROUP BY nr.idserviceline, nr.serviceline_nome, nr.idarea, nr.area_nome,
+               nr.idnivel, nr.nivel_nome, nr.pos
+      ORDER BY nr.idserviceline ASC, nr.idarea ASC, nr.pos ASC
+    `, [userId]);
+
+    const slMap = new Map();
+
+    for (const row of rows) {
+
+      if (!slMap.has(row.idserviceline)) {
+        slMap.set(row.idserviceline, {
+          idserviceline: row.idserviceline,
+          nome: row.serviceline_nome,
+          areas: new Map()
+        });
+      }
+      const sl = slMap.get(row.idserviceline);
+
+      if (!sl.areas.has(row.idarea)) {
+        sl.areas.set(row.idarea, { idarea: row.idarea, nome: row.area_nome, niveis: [] });
+      }
+      sl.areas.get(row.idarea).niveis.push({
+        nivel_grupo:      row.nivel_grupo,      // "A", "B", "C", "D", "E"
+        total_badges:     parseInt(row.total_badges),
+        badges_aprovados: parseInt(row.badges_aprovados),
+        estado:           row.estado,
+      });
+    }
+
+    const servicelines = Array.from(slMap.values()).map(sl => ({
+      ...sl,
+      areas: Array.from(sl.areas.values())
+    }));
+
+    res.json({
+      learningpath: learningPathNome,
+      progresso: { badges_aprovados: badgesAprovados, total_badges: totalBadges },
+      servicelines
+    });
+  } catch (err) {
+    console.error('Erro ao carregar dashboard:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// LEMBRETES
+// ─────────────────────────────────────────────────────────
+app.get('/utilizadores/:id/lembretes', async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (isNaN(userId)) return res.status(400).json({ error: 'ID inválido' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM lembretes WHERE utilizador_id = $1 ORDER BY concluido ASC, prazo ASC`,
+      [userId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Erro ao listar lembretes:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/utilizadores/:id/lembretes', async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (isNaN(userId)) return res.status(400).json({ error: 'ID inválido' });
+
+  const { titulo, descricao, prazo, badge_id, badge_nome } = req.body;
+  if (!titulo || !prazo) {
+    return res.status(400).json({ error: 'titulo e prazo são obrigatórios' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO lembretes (utilizador_id, titulo, descricao, badge_id, badge_nome, prazo)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [userId, titulo, descricao || null, badge_id || null, badge_nome || null, prazo]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('Erro ao criar lembrete:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/lembretes/:id/concluir', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+  try {
+    await pool.query(`UPDATE lembretes SET concluido = TRUE WHERE id = $1`, [id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Erro ao concluir lembrete:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/lembretes/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+  try {
+    await pool.query('DELETE FROM lembretes WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Erro ao eliminar lembrete:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────
 // START
 // ─────────────────────────────────────────────────────────
 app.listen(3000, "0.0.0.0", () => {

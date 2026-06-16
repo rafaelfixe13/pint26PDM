@@ -13,7 +13,6 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _verPassword = false;
-  bool _manterSessao = false;
   bool _loading = false;
   String? _erro;
 
@@ -184,21 +183,6 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               SizedBox(height: 16),
-              Row(
-                children: [
-                  Checkbox(
-                    value: _manterSessao,
-                    onChanged: (v) =>
-                        setState(() => _manterSessao = v ?? false),
-                    activeColor: Color(0xFF2563EB),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4)),
-                  ),
-                  Text('Manter sessão iniciada',
-                      style: TextStyle(fontSize: 13, color: Colors.black87)),
-                ],
-              ),
-              SizedBox(height: 8),
               if (_erro != null)
                 Padding(
                   padding: EdgeInsets.only(bottom: 12),

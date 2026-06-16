@@ -539,6 +539,103 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getDashboard() async {
+    final userId = Session.id;
+    if (userId == 0) throw Exception('Sessão inválida. Faz login novamente.');
+
+    final response = await _get(
+      Uri.parse('$baseUrl/utilizadores/$userId/dashboard'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as Map<String, dynamic>;
+    }
+
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao carregar dashboard'),
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> getLembretes() async {
+    final userId = Session.id;
+    if (userId == 0) throw Exception('Sessão inválida. Faz login novamente.');
+
+    final response = await _get(
+      Uri.parse('$baseUrl/utilizadores/$userId/lembretes'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      final list = _decodeJsonSafely(response) as List;
+      return list.cast<Map<String, dynamic>>();
+    }
+
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao carregar lembretes'),
+    );
+  }
+
+  static Future<Map<String, dynamic>> criarLembrete({
+    required String titulo,
+    required String descricao,
+    required DateTime prazo,
+    int? badgeId,
+    String? badgeNome,
+  }) async {
+    final userId = Session.id;
+    if (userId == 0) throw Exception('Sessão inválida. Faz login novamente.');
+
+    final response = await _post(
+      Uri.parse('$baseUrl/utilizadores/$userId/lembretes'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'titulo': titulo,
+        'descricao': descricao.isEmpty ? null : descricao,
+        'prazo': prazo.toIso8601String(),
+        'badge_id': badgeId,
+        'badge_nome': badgeNome,
+      }),
+    );
+
+    if (response.statusCode == 201) {
+      return _decodeJsonSafely(response) as Map<String, dynamic>;
+    }
+
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao criar lembrete'),
+    );
+  }
+
+  static Future<void> concluirLembrete(int id) async {
+    final response = await _patch(
+      Uri.parse('$baseUrl/lembretes/$id/concluir'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        _extractErrorMessage(response, fallback: 'Erro ao concluir lembrete'),
+      );
+    }
+  }
+
+  static Future<void> eliminarLembrete(int id) async {
+    final response = await _delete(
+      Uri.parse('$baseUrl/lembretes/$id'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        _extractErrorMessage(response, fallback: 'Erro ao eliminar lembrete'),
+      );
+    }
+  }
+
   static Future<void> verificarExpiracaoNotificacoes(int userId) async {
     try {
       await _post(
