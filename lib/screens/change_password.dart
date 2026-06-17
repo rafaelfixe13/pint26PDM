@@ -128,111 +128,116 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
-            const Center(
-              child: Text(
-                'Alterar a Password',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3A6EAB),
-                ),
-              ),
-            ),
-            const SizedBox(height: 40),
-            const Text(
-              'Password Atual',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF2D2D2D),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _currentPassController,
-              obscureText: !_showCurrent,
-              decoration: _inputDecoration(
-                hint: 'Introduz a password atual',
-                obscure: !_showCurrent,
-                onToggle: () => setState(() => _showCurrent = !_showCurrent),
-              ),
-            ),
-            const SizedBox(height: 26),
-            const Text(
-              'Password Nova',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF2D2D2D),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _newPassController,
-              obscureText: !_showNew,
-              decoration: _inputDecoration(
-                hint: 'Introduz a password nova',
-                obscure: !_showNew,
-                onToggle: () => setState(() => _showNew = !_showNew),
-              ),
-            ),
-            const SizedBox(height: 26),
-            const Text(
-              'Confirmar Password',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF2D2D2D),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _confirmPassController,
-              obscureText: !_showConfirm,
-              decoration: _inputDecoration(
-                hint: 'Confirma a nova password',
-                obscure: !_showConfirm,
-                onToggle: () => setState(() => _showConfirm = !_showConfirm),
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 18),
-              Text(
-                _error!,
-                style: const TextStyle(color: Colors.red, fontSize: 16),
-              ),
-            ],
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              height: 64,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _alterarPassword,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4579B2),
-                  disabledBackgroundColor: const Color(0xFF4579B2),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
+        child: AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 20),
+              const Center(
+                child: Text(
+                  'Alterar a Password',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3A6EAB),
                   ),
                 ),
-                child: _loading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Alterar e Entrar',
-                        style: TextStyle(
-                          fontSize: 19,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
               ),
-            ),
-          ],
+              const SizedBox(height: 40),
+              const Text(
+                'Password Atual',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2D2D2D),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _currentPassController,
+                obscureText: !_showCurrent,
+                autofillHints: const [AutofillHints.password],
+                decoration: _inputDecoration(
+                  hint: 'Introduz a password atual',
+                  obscure: !_showCurrent,
+                  onToggle: () => setState(() => _showCurrent = !_showCurrent),
+                ),
+              ),
+              const SizedBox(height: 26),
+              const Text(
+                'Password Nova',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2D2D2D),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _newPassController,
+                obscureText: !_showNew,
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: _inputDecoration(
+                  hint: 'Introduz a password nova',
+                  obscure: !_showNew,
+                  onToggle: () => setState(() => _showNew = !_showNew),
+                ),
+              ),
+              const SizedBox(height: 26),
+              const Text(
+                'Confirmar Password',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2D2D2D),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _confirmPassController,
+                obscureText: !_showConfirm,
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: _inputDecoration(
+                  hint: 'Confirma a nova password',
+                  obscure: !_showConfirm,
+                  onToggle: () => setState(() => _showConfirm = !_showConfirm),
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 18),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.red, fontSize: 16),
+                ),
+              ],
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 64,
+                child: ElevatedButton(
+                  onPressed: _loading ? null : _alterarPassword,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4579B2),
+                    disabledBackgroundColor: const Color(0xFF4579B2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                  ),
+                  child: _loading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Alterar e Entrar',
+                          style: TextStyle(
+                            fontSize: 19,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+import '../services/first_login_service.dart';
 import '../services/cache_service.dart';
+import 'check_email_page.dart';
 import 'login_page.dart';
 
 class SignUpPage extends StatefulWidget {
@@ -16,12 +20,11 @@ class _SignUpPageState extends State<SignUpPage> {
 
   bool _verPassword = false;
   bool _verConfirmar = false;
-  bool _loading = false;
   String? _erro;
-  
   List<dynamic> _areas = [];
   int? _areaSelecionada;
   bool _carregandoAreas = false;
+  bool _loading = false;
 
   @override
   void initState() {
@@ -37,7 +40,9 @@ class _SignUpPageState extends State<SignUpPage> {
     } catch (e) {
       print('Erro ao carregar áreas: $e');
     } finally {
-      setState(() => _carregandoAreas = false);
+      if (mounted) {
+        setState(() => _carregandoAreas = false);
+      }
     }
   }
 
@@ -56,7 +61,6 @@ class _SignUpPageState extends State<SignUpPage> {
     final password = _passwordController.text.trim();
     final confirmar = _confirmarPasswordController.text.trim();
 
-    // validações
     if (nome.isEmpty || email.isEmpty || password.isEmpty || confirmar.isEmpty) {
       setState(() => _erro = 'Preenche todos os campos');
       return;
@@ -88,27 +92,44 @@ class _SignUpPageState extends State<SignUpPage> {
     });
 
     try {
-      await ApiService.registro(nome, email, password, _areaSelecionada);
+      final response = await http.post(
+        Uri.parse('${FirstLoginService.baseUrl}/registro'),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'nome': nome,
+          'email': email,
+          'password': password,
+          'idarea': _areaSelecionada,
+        }),
+      );
 
-      // registo bem sucedido — vai para o login
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Conta criada com sucesso! Faz login.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => LoginPage()),
-        );
+      if (!mounted) {
+        return;
       }
+
+      if (response.statusCode == 201) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const CheckEmailPage()),
+          (_) => false,
+        );
+        return;
+      }
+
+      final decoded = response.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body) as Map<String, dynamic>;
+
+      setState(() {
+        _erro = decoded['error']?.toString() ?? 'Não foi possível criar a conta';
+      });
     } catch (e) {
       setState(() {
         _erro = e.toString().replaceAll('Exception: ', '');
       });
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -122,10 +143,7 @@ class _SignUpPageState extends State<SignUpPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               SizedBox(height: 20),
-
-              // Logo SOFTINSA
               Center(
                 child: RichText(
                   text: TextSpan(
@@ -151,9 +169,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
-
               SizedBox(height: 12),
-
               Center(
                 child: Text(
                   'REGISTO',
@@ -165,10 +181,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
-
               SizedBox(height: 32),
-
-              // Nome
               Text('Nome completo',
                   style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
               SizedBox(height: 8),
@@ -177,10 +190,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 hint: 'Ex: João Silva',
                 icon: Icons.person_outline,
               ),
-
               SizedBox(height: 16),
-
-              // Email
               Text('Email',
                   style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
               SizedBox(height: 8),
@@ -190,10 +200,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 icon: Icons.email_outlined,
                 tipo: TextInputType.emailAddress,
               ),
-
               SizedBox(height: 16),
-
-              // Área
               Text('Área de Atuação',
                   style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
               SizedBox(height: 8),
@@ -253,7 +260,6 @@ class _SignUpPageState extends State<SignUpPage> {
                             .toList(),
                       ),
                     ),
-
               SizedBox(height: 16),
               Text('Password',
                   style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
@@ -264,10 +270,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 ver: _verPassword,
                 onToggle: () => setState(() => _verPassword = !_verPassword),
               ),
-
               SizedBox(height: 16),
-
-              // Confirmar Password
               Text('Confirmar Password',
                   style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
               SizedBox(height: 8),
@@ -277,10 +280,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 ver: _verConfirmar,
                 onToggle: () => setState(() => _verConfirmar = !_verConfirmar),
               ),
-
               SizedBox(height: 16),
-
-              // Erro
               if (_erro != null)
                 Padding(
                   padding: EdgeInsets.only(bottom: 12),
@@ -297,10 +297,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     ],
                   ),
                 ),
-
               SizedBox(height: 8),
-
-              // Botão Registar
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -327,10 +324,7 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                 ),
               ),
-
               SizedBox(height: 24),
-
-              // Já tem conta
               Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -402,9 +396,15 @@ class _SignUpPageState extends State<SignUpPage> {
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: Colors.grey),
-        prefixIcon: Icon(Icons.lock_outline, color: Colors.grey),
         filled: true,
         fillColor: Color(0xFFF1F5F9),
+        prefixIcon: Icon(Icons.lock_outline, color: Colors.grey),
+        suffixIcon: IconButton(
+          icon: Icon(
+              ver ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              color: Colors.grey),
+          onPressed: onToggle,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -414,13 +414,6 @@ class _SignUpPageState extends State<SignUpPage> {
           borderSide: BorderSide(color: Color(0xFF2563EB), width: 1.5),
         ),
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        suffixIcon: IconButton(
-          icon: Icon(
-            ver ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-            color: Colors.grey,
-          ),
-          onPressed: onToggle,
-        ),
       ),
     );
   }

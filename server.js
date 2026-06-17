@@ -46,10 +46,45 @@ async function sendCandidaturaConfirmation(email, nome, badgeNome, idCandidatura
     console.error('Erro ao enviar email de confirmação:', err.message);
   }
 }
-
+      
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.use((req, res, next) => {
+  if (req.method === "POST" && req.path.toLowerCase().includes("candidatura")) {
+    const originalJson = res.json.bind(res);
+
+    res.json = function patchedJson(payload) {
+      res.once("finish", async () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          return;
+        }
+
+        const body = req.body || {};
+        const email = body.email || body.utilizador?.email || body.candidato?.email;
+        const nome = body.nome || body.utilizador?.nome || body.candidato?.nome;
+        const candidaturaId =
+          payload?.candidatura?.idcandidatura ||
+          payload?.candidatura?.id ||
+          payload?.idcandidatura ||
+          payload?.id;
+
+        if (email) {
+          try {
+            await sendCandidaturaConfirmation(email, nome, "", candidaturaId);
+          } catch (mailErr) {
+            console.error("Erro ao enviar confirmação de candidatura:", mailErr.message);
+          }
+        }
+      });
+
+      return originalJson(payload);
+    };
+  }
+
+  next();
+});
 
 // ─── BASE DE DADOS ───────────────────────────────────────
 const pool = new Pool({
@@ -1164,6 +1199,209 @@ app.post("/alterar-password", async (req, res) => {
     });
   } catch (err) {
     console.error("Erro ao alterar password:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+function createMailer() {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || "false").toLowerCase() === "true",
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+}
+
+async function sendFirstLoginTokenEmail(nome, email, token) {
+  const transporter = createMailer();
+
+  if (!transporter) {
+    console.warn("Configuração SMTP em falta, email de primeiro login não enviado");
+    return;
+  }
+
+  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+
+  await transporter.sendMail({
+    from,
+    to: email,
+    subject: "Token de confirmação de email",
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+        <h2>Olá${nome ? `, ${nome}` : ""}</h2>
+        <p>Foi gerado um token para confirmar o seu email no primeiro acesso.</p>
+        <p><strong>Token:</strong> ${token}</p>
+        <p>Este token expira em 24 horas.</p>
+      </div>
+    `,
+  });
+}
+
+async function sendCandidaturaConfirmationEmail(nome, email, candidaturaId) {
+  const transporter = createMailer();
+
+  if (!transporter) {
+    console.warn("Configuração SMTP em falta, email de candidatura não enviado");
+    return;
+  }
+
+  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+
+  await transporter.sendMail({
+    from,
+    to: email,
+    subject: "Confirmação de candidatura",
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+        <h2>Olá${nome ? `, ${nome}` : ""}</h2>
+        <p>A sua candidatura foi submetida com sucesso.</p>
+        ${candidaturaId ? `<p><strong>ID da candidatura:</strong> ${candidaturaId}</p>` : ""}
+      </div>
+    `,
+  });
+}
+
+app.post("/auth/first-login-verify", async (req, res) => {
+  const { idutilizador, token } = req.body;
+
+  if (!idutilizador || !token) {
+    return res.status(400).json({ error: "idutilizador e token são obrigatórios" });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM utilizadores WHERE idutilizador = $1",
+      [idutilizador]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    const user = result.rows[0];
+
+    if (!user.primeirologintokenhash) {
+      return res.status(400).json({ error: "Não existe token pendente" });
+    }
+
+    if (user.primeirologintokenexpires && new Date(user.primeirologintokenexpires) < new Date()) {
+      return res.status(410).json({ error: "Token expirado" });
+    }
+
+    const match = await bcrypt.compare(String(token), user.primeirologintokenhash);
+
+    if (!match) {
+      return res.status(401).json({ error: "Token inválido" });
+    }
+
+    await pool.query(
+      `UPDATE utilizadores
+         SET emailconfirmado = TRUE,
+             primeirologintokenhash = NULL,
+             primeirologintokenexpires = NULL
+       WHERE idutilizador = $1`,
+      [idutilizador]
+    );
+
+    res.json({
+      success: true,
+      message: "Email confirmado com sucesso",
+    });
+  } catch (err) {
+    console.error("Erro na verificação do primeiro login:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/auth/send-first-login-token", async (req, res) => {
+  const { idutilizador } = req.body;
+
+  if (!idutilizador) {
+    return res.status(400).json({ error: "idutilizador é obrigatório" });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM utilizadores WHERE idutilizador = $1",
+      [idutilizador]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    const user = result.rows[0];
+
+    if (user.emailconfirmado) {
+      return res.status(400).json({ error: "Email já confirmado" });
+    }
+
+    const token = await bcrypt.genSalt(10);
+    const tokenHash = await bcrypt.hash(token, 10);
+    const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await pool.query(
+      `UPDATE utilizadores
+         SET primeirologintokenhash = $1,
+             primeirologintokenexpires = $2
+       WHERE idutilizador = $3`,
+      [tokenHash, tokenExpires, idutilizador]
+    );
+
+    await sendFirstLoginTokenEmail(user.nome, user.email, token);
+
+    res.json({
+      success: true,
+      message: "Token enviado com sucesso",
+    });
+  } catch (err) {
+    console.error("Erro ao enviar token de primeiro login:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/auth/change-password-first-login", async (req, res) => {
+  const { idutilizador, passwordNova } = req.body;
+
+  if (!idutilizador || !passwordNova) {
+    return res.status(400).json({ error: "idutilizador e passwordNova são obrigatórios" });
+  }
+
+  if (String(passwordNova).length < 6) {
+    return res.status(400).json({ error: "A nova password deve ter pelo menos 6 caracteres" });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM utilizadores WHERE idutilizador = $1",
+      [idutilizador]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    const novoHash = await bcrypt.hash(passwordNova, 10);
+
+    await pool.query(
+      "UPDATE utilizadores SET passwordhash = $1, primeirologin = FALSE WHERE idutilizador = $2",
+      [novoHash, idutilizador]
+    );
+
+    res.json({
+      success: true,
+      message: "Password alterada com sucesso",
+    });
+  } catch (err) {
+    console.error("Erro ao alterar password do primeiro login:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
