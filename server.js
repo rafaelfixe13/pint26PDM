@@ -1432,7 +1432,11 @@ app.post("/auth/send-first-login-token", async (req, res) => {
       [tokenHash, tokenExpires, idutilizador]
     );
 
-    await sendFirstLoginTokenEmail(user.nome, user.email, token);
+    // Enviar o email em background: a resposta não fica à espera do SMTP
+    // (que, combinado com o "cold start" do Render, podia causar timeouts).
+    sendFirstLoginTokenEmail(user.nome, user.email, token).catch((err) => {
+      console.error("Erro ao enviar email de primeiro login:", err.message);
+    });
 
     res.json({
       success: true,

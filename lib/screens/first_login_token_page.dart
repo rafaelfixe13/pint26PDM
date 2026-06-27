@@ -36,32 +36,41 @@ class _FirstLoginTokenPageState extends State<FirstLoginTokenPage> {
       _error = null;
     });
 
-    final result = await FirstLoginService.verifyFirstLogin(
-      widget.idutilizador,
-      _tokenController.text.trim(),
-    );
+    try {
+      final result = await FirstLoginService.verifyFirstLogin(
+        widget.idutilizador,
+        _tokenController.text.trim(),
+      );
 
-    if (!mounted) {
-      return;
-    }
+      if (!mounted) {
+        return;
+      }
 
-    setState(() {
-      _isLoading = false;
-    });
+      if (result['ok'] == true) {
+        context.go('/first-login-change-password', extra: {
+          'idutilizador': widget.idutilizador,
+        });
+        return;
+      }
 
-    if (result['ok'] == true) {
-      context.go('/first-login-change-password', extra: {
-        'idutilizador': widget.idutilizador,
+      final message = (result['data'] as Map<String, dynamic>?)?['error']?.toString() ??
+          'Não foi possível validar o token';
+
+      setState(() {
+        _error = message;
       });
-      return;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Não foi possível ligar ao servidor. Tenta novamente.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
-
-    final message = (result['data'] as Map<String, dynamic>?)?['error']?.toString() ??
-        'Não foi possível validar o token';
-
-    setState(() {
-      _error = message;
-    });
   }
 
   Future<void> _resendToken() async {

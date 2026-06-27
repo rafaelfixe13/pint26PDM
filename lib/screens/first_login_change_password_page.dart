@@ -44,30 +44,39 @@ class _FirstLoginChangePasswordPageState extends State<FirstLoginChangePasswordP
       _error = null;
     });
 
-    final result = await FirstLoginService.changePasswordFirstLogin(
-      widget.idutilizador,
-      password,
-    );
+    try {
+      final result = await FirstLoginService.changePasswordFirstLogin(
+        widget.idutilizador,
+        password,
+      );
 
-    if (!mounted) {
-      return;
+      if (!mounted) {
+        return;
+      }
+
+      if (result['ok'] == true) {
+        context.go('/');
+        return;
+      }
+
+      final message = (result['data'] as Map<String, dynamic>?)?['error']?.toString() ??
+          'Não foi possível alterar a password';
+
+      setState(() {
+        _error = message;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Não foi possível ligar ao servidor. Tenta novamente.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (result['ok'] == true) {
-      context.go('/');
-      return;
-    }
-
-    final message = (result['data'] as Map<String, dynamic>?)?['error']?.toString() ??
-        'Não foi possível alterar a password';
-
-    setState(() {
-      _error = message;
-    });
   }
 
   @override
