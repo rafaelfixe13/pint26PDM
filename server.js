@@ -12,49 +12,44 @@ const path = require("path");
 const fs = require("fs");
 const { createCanvas, loadImage } = require('canvas');
 require('dotenv').config();
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const { initializeApp: initializeFirebaseApp, cert } = require('firebase-admin/app');
 const { getMessaging } = require('firebase-admin/messaging');
 
 // ─────────────────────────────────────────────────────────
-// CONFIGURAÇÃO DO SMTP (usar variáveis de ambiente em .env)
+// EMAIL (SendGrid via API HTTPS — SMTP de saída é bloqueado em muitos PaaS,
+// incluindo o Render, daí usar uma API em vez de ligação SMTP direta)
 // ─────────────────────────────────────────────────────────
-const smtpConfig = {
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '465', 10),
-  secure: (process.env.SMTP_SECURE || 'true') === 'true',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  // Força IPv4: o Render não tem saída IPv6 fiável e o "Happy Eyeballs" do
-  // Node tentava sempre IPv6 primeiro, dando ENETUNREACH.
-  family: 4,
-};
-
-if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
-  console.warn('SMTP credentials not set. Set SMTP_USER and SMTP_PASS in your .env');
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+} else {
+  console.warn('SENDGRID_API_KEY não definida. Sets em .env para enviar emails.');
 }
 
-const mailTransporter = nodemailer.createTransport(smtpConfig);
+async function enviarEmail({ to, subject, html, text }) {
+  if (!to || !process.env.SENDGRID_API_KEY) return;
+  try {
+    await sgMail.send({
+      to,
+      from: process.env.EMAIL_FROM || 'no-reply@example.com',
+      subject,
+      text: text || html?.replace(/<[^>]+>/g, ''),
+      html,
+    });
+  } catch (err) {
+    console.error('Erro ao enviar email:', err.response?.body?.errors || err.message);
+  }
+}
 
 async function sendCandidaturaConfirmation(email, nome, badgeNome, idCandidatura) {
   if (!email) return;
 
-  const mailOptions = {
-    from: process.env.EMAIL_FROM || 'no-reply@example.com',
+  await enviarEmail({
     to: email,
     subject: `Confirmação de submissão da candidatura #${idCandidatura}`,
-    text: `Olá ${nome || ''},\n\nRecebemos a sua candidatura para o badge "${badgeNome}". O ID da candidatura é ${idCandidatura}.\n\nObrigado,\nEquipa PINT`,
     html: `<p>Olá ${nome || ''},</p><p>Recebemos a sua candidatura para o badge "<strong>${badgeNome}</strong>".</p><p><strong>ID da candidatura:</strong> ${idCandidatura}</p><p>Obrigado,<br/>Equipa PINT</p>`,
-  };
-
-  try {
-    await mailTransporter.sendMail(mailOptions);
-    console.log('Email de confirmação enviado para', email);
-  } catch (err) {
-    console.error('Erro ao enviar email de confirmação:', err.message);
-  }
+  });
+  console.log('Email de confirmação enviado para', email);
 }
       
 const app = express();
@@ -1288,35 +1283,8 @@ app.post("/alterar-password", async (req, res) => {
 });
 
 
-function createMailer() {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    return null;
-  }
-
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: String(process.env.SMTP_SECURE || "false").toLowerCase() === "true",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    family: 4,
-  });
-}
-
 async function sendFirstLoginTokenEmail(nome, email, token) {
-  const transporter = createMailer();
-
-  if (!transporter) {
-    console.warn("Configuração SMTP em falta, email de primeiro login não enviado");
-    return;
-  }
-
-  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
-
-  await transporter.sendMail({
-    from,
+  await enviarEmail({
     to: email,
     subject: "Token de confirmação de email",
     html: `
@@ -1325,30 +1293,6 @@ async function sendFirstLoginTokenEmail(nome, email, token) {
         <p>Foi gerado um token para confirmar o seu email no primeiro acesso.</p>
         <p><strong>Token:</strong> ${token}</p>
         <p>Este token expira em 24 horas.</p>
-      </div>
-    `,
-  });
-}
-
-async function sendCandidaturaConfirmationEmail(nome, email, candidaturaId) {
-  const transporter = createMailer();
-
-  if (!transporter) {
-    console.warn("Configuração SMTP em falta, email de candidatura não enviado");
-    return;
-  }
-
-  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
-
-  await transporter.sendMail({
-    from,
-    to: email,
-    subject: "Confirmação de candidatura",
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
-        <h2>Olá${nome ? `, ${nome}` : ""}</h2>
-        <p>A sua candidatura foi submetida com sucesso.</p>
-        ${candidaturaId ? `<p><strong>ID da candidatura:</strong> ${candidaturaId}</p>` : ""}
       </div>
     `,
   });
