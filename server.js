@@ -1,3 +1,8 @@
+const dns = require("dns");
+// O Render (e outros PaaS) não tem saída IPv6 fiável; sem isto, ligações
+// SMTP (Gmail) resolvem para IPv6 e falham com ENETUNREACH.
+dns.setDefaultResultOrder("ipv4first");
+
 const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
