@@ -27,6 +27,9 @@ const smtpConfig = {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  // Força IPv4: o Render não tem saída IPv6 fiável e o "Happy Eyeballs" do
+  // Node tentava sempre IPv6 primeiro, dando ENETUNREACH.
+  family: 4,
 };
 
 if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
@@ -1298,6 +1301,7 @@ function createMailer() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    family: 4,
   });
 }
 
