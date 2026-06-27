@@ -494,6 +494,20 @@ class ApiService {
     );
   }
 
+  static Future<void> salvarFcmToken(int userId, String token) async {
+    final response = await _patch(
+      Uri.parse('$baseUrl/utilizadores/$userId/fcm-token'),
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: jsonEncode({'token': token}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        _extractErrorMessage(response, fallback: 'Erro ao guardar token de notificações'),
+      );
+    }
+  }
+
   static Future<void> marcarLida(int id) async {
     final response = await _patch(
       Uri.parse('$baseUrl/notificacoes/$id/lida'),
@@ -640,6 +654,15 @@ class ApiService {
     try {
       await _post(
         Uri.parse('$baseUrl/utilizadores/$userId/notificacoes-expiracao'),
+        headers: {'Accept': 'application/json'},
+      );
+    } catch (_) {}
+  }
+
+  static Future<void> verificarLembretesNotificacoes(int userId) async {
+    try {
+      await _post(
+        Uri.parse('$baseUrl/utilizadores/$userId/notificacoes-lembretes'),
         headers: {'Accept': 'application/json'},
       );
     } catch (_) {}

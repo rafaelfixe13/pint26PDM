@@ -6,19 +6,141 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { createCanvas, loadImage } = require('canvas');
+require('dotenv').config();
+const nodemailer = require('nodemailer');
+const { initializeApp: initializeFirebaseApp, cert } = require('firebase-admin/app');
+const { getMessaging } = require('firebase-admin/messaging');
 
+// ─────────────────────────────────────────────────────────
+// CONFIGURAÇÃO DO SMTP (usar variáveis de ambiente em .env)
+// ─────────────────────────────────────────────────────────
+const smtpConfig = {
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '465', 10),
+  secure: (process.env.SMTP_SECURE || 'true') === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+};
+
+if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
+  console.warn('SMTP credentials not set. Set SMTP_USER and SMTP_PASS in your .env');
+}
+
+const mailTransporter = nodemailer.createTransport(smtpConfig);
+
+async function sendCandidaturaConfirmation(email, nome, badgeNome, idCandidatura) {
+  if (!email) return;
+
+  const mailOptions = {
+    from: process.env.EMAIL_FROM || 'no-reply@example.com',
+    to: email,
+    subject: `Confirmação de submissão da candidatura #${idCandidatura}`,
+    text: `Olá ${nome || ''},\n\nRecebemos a sua candidatura para o badge "${badgeNome}". O ID da candidatura é ${idCandidatura}.\n\nObrigado,\nEquipa PINT`,
+    html: `<p>Olá ${nome || ''},</p><p>Recebemos a sua candidatura para o badge "<strong>${badgeNome}</strong>".</p><p><strong>ID da candidatura:</strong> ${idCandidatura}</p><p>Obrigado,<br/>Equipa PINT</p>`,
+  };
+
+  try {
+    await mailTransporter.sendMail(mailOptions);
+    console.log('Email de confirmação enviado para', email);
+  } catch (err) {
+    console.error('Erro ao enviar email de confirmação:', err.message);
+  }
+}
+      
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use((req, res, next) => {
+  if (req.method === "POST" && req.path.toLowerCase().includes("candidatura")) {
+    const originalJson = res.json.bind(res);
+
+    res.json = function patchedJson(payload) {
+      res.once("finish", async () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          return;
+        }
+
+        const body = req.body || {};
+        const email = body.email || body.utilizador?.email || body.candidato?.email;
+        const nome = body.nome || body.utilizador?.nome || body.candidato?.nome;
+        const candidaturaId =
+          payload?.candidatura?.idcandidatura ||
+          payload?.candidatura?.id ||
+          payload?.idcandidatura ||
+          payload?.id;
+
+        if (email) {
+          try {
+            await sendCandidaturaConfirmation(email, nome, "", candidaturaId);
+          } catch (mailErr) {
+            console.error("Erro ao enviar confirmação de candidatura:", mailErr.message);
+          }
+        }
+      });
+
+      return originalJson(payload);
+    };
+  }
+
+  next();
+});
+
 // ─── BASE DE DADOS ───────────────────────────────────────
 const pool = new Pool({
-  user: "pint",
-  host: "100.105.58.22",
-  database: "testes2",
-  password: "pint26",
-  port: 5432,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASS,
+  port: parseInt(process.env.DB_PORT || "5432", 10),
+  ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
 });
+
+// Sem isto, uma ligação inativa do pool a cair (ex: falha momentânea de
+// rede/VPN) emite um 'error' sem listener e crasha o processo todo.
+pool.on("error", (err) => {
+  console.error("Erro de ligação à base de dados (pool):", err.message);
+});
+
+// ─── FIREBASE ADMIN (notificações push) ─────────────────
+// Em produção (Render) não há ficheiro: a credencial vem da variável de
+// ambiente FIREBASE_SERVICE_ACCOUNT_JSON (conteúdo do .json, em texto).
+// Em desenvolvimento local, usa-se o ficheiro firebase-service-account.json.
+let firebaseApp = null;
+try {
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
+    : require('./firebase-service-account.json');
+  firebaseApp = initializeFirebaseApp({
+    credential: cert(serviceAccount),
+  });
+  console.log('Firebase Admin inicializado.');
+} catch (err) {
+  console.warn('Firebase Admin não inicializado (falta a credencial):', err.message);
+}
+
+// Envia uma notificação push para um utilizador, usando o token FCM guardado.
+// Não lança erro: se o token não existir ou o envio falhar, fica só em log.
+async function enviarPush(idutilizador, titulo, mensagem) {
+  if (!firebaseApp) return;
+  try {
+    const { rows } = await pool.query(
+      'SELECT fcm_token FROM utilizadores WHERE idutilizador = $1',
+      [idutilizador]
+    );
+    const token = rows[0]?.fcm_token;
+    if (!token) return;
+
+    await getMessaging(firebaseApp).send({
+      token,
+      notification: { title: titulo, body: mensagem },
+    });
+  } catch (err) {
+    console.error('Erro ao enviar push:', err.message);
+  }
+}
 
 
 
@@ -705,6 +827,29 @@ app.post("/candidaturas", upload.any(), async (req, res) => {
 
     await client.query("COMMIT");
 
+    // Enviar email de confirmação em background (fire-and-forget)
+    (async () => {
+      try {
+        const userResult = await pool.query(
+          'SELECT nome, email FROM utilizadores WHERE idutilizador = $1',
+          [userId]
+        );
+
+        const badgeResult = await pool.query(
+          'SELECT nome FROM badges WHERE idbadge = $1',
+          [badgeId]
+        );
+
+        const userEmail = userResult.rows[0]?.email;
+        const userNome = userResult.rows[0]?.nome;
+        const badgeNome = badgeResult.rows[0]?.nome;
+
+        sendCandidaturaConfirmation(userEmail, userNome, badgeNome, idCandidatura);
+      } catch (emailErr) {
+        console.error('Erro ao preparar envio de email:', emailErr.message);
+      }
+    })();
+
     res.status(200).json({
       success: true,
       message: "Candidatura submetida com sucesso",
@@ -859,6 +1004,30 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("Erro ao buscar badges do utilizador:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /utilizadores/:id/fcm-token  body: { token }
+// Guarda o token FCM mais recente do dispositivo deste utilizador, para
+// permitir o envio de notificações push direcionadas (ver enviarPush()).
+app.patch("/utilizadores/:id/fcm-token", async (req, res) => {
+  try {
+    const idUtilizador = parseInt(req.params.id, 10);
+    const { token } = req.body;
+
+    if (isNaN(idUtilizador) || !token) {
+      return res.status(400).json({ error: "ID do utilizador ou token inválido" });
+    }
+
+    await pool.query(
+      "UPDATE utilizadores SET fcm_token = $1 WHERE idutilizador = $2",
+      [token, idUtilizador]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Erro ao guardar token FCM:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1105,6 +1274,209 @@ app.post("/alterar-password", async (req, res) => {
   }
 });
 
+
+function createMailer() {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || "false").toLowerCase() === "true",
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+}
+
+async function sendFirstLoginTokenEmail(nome, email, token) {
+  const transporter = createMailer();
+
+  if (!transporter) {
+    console.warn("Configuração SMTP em falta, email de primeiro login não enviado");
+    return;
+  }
+
+  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+
+  await transporter.sendMail({
+    from,
+    to: email,
+    subject: "Token de confirmação de email",
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+        <h2>Olá${nome ? `, ${nome}` : ""}</h2>
+        <p>Foi gerado um token para confirmar o seu email no primeiro acesso.</p>
+        <p><strong>Token:</strong> ${token}</p>
+        <p>Este token expira em 24 horas.</p>
+      </div>
+    `,
+  });
+}
+
+async function sendCandidaturaConfirmationEmail(nome, email, candidaturaId) {
+  const transporter = createMailer();
+
+  if (!transporter) {
+    console.warn("Configuração SMTP em falta, email de candidatura não enviado");
+    return;
+  }
+
+  const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+
+  await transporter.sendMail({
+    from,
+    to: email,
+    subject: "Confirmação de candidatura",
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+        <h2>Olá${nome ? `, ${nome}` : ""}</h2>
+        <p>A sua candidatura foi submetida com sucesso.</p>
+        ${candidaturaId ? `<p><strong>ID da candidatura:</strong> ${candidaturaId}</p>` : ""}
+      </div>
+    `,
+  });
+}
+
+app.post("/auth/first-login-verify", async (req, res) => {
+  const { idutilizador, token } = req.body;
+
+  if (!idutilizador || !token) {
+    return res.status(400).json({ error: "idutilizador e token são obrigatórios" });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM utilizadores WHERE idutilizador = $1",
+      [idutilizador]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    const user = result.rows[0];
+
+    if (!user.primeirologintokenhash) {
+      return res.status(400).json({ error: "Não existe token pendente" });
+    }
+
+    if (user.primeirologintokenexpires && new Date(user.primeirologintokenexpires) < new Date()) {
+      return res.status(410).json({ error: "Token expirado" });
+    }
+
+    const match = await bcrypt.compare(String(token), user.primeirologintokenhash);
+
+    if (!match) {
+      return res.status(401).json({ error: "Token inválido" });
+    }
+
+    await pool.query(
+      `UPDATE utilizadores
+         SET emailconfirmado = TRUE,
+             primeirologintokenhash = NULL,
+             primeirologintokenexpires = NULL
+       WHERE idutilizador = $1`,
+      [idutilizador]
+    );
+
+    res.json({
+      success: true,
+      message: "Email confirmado com sucesso",
+    });
+  } catch (err) {
+    console.error("Erro na verificação do primeiro login:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/auth/send-first-login-token", async (req, res) => {
+  const { idutilizador } = req.body;
+
+  if (!idutilizador) {
+    return res.status(400).json({ error: "idutilizador é obrigatório" });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM utilizadores WHERE idutilizador = $1",
+      [idutilizador]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    const user = result.rows[0];
+
+    if (user.emailconfirmado) {
+      return res.status(400).json({ error: "Email já confirmado" });
+    }
+
+    const token = await bcrypt.genSalt(10);
+    const tokenHash = await bcrypt.hash(token, 10);
+    const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await pool.query(
+      `UPDATE utilizadores
+         SET primeirologintokenhash = $1,
+             primeirologintokenexpires = $2
+       WHERE idutilizador = $3`,
+      [tokenHash, tokenExpires, idutilizador]
+    );
+
+    await sendFirstLoginTokenEmail(user.nome, user.email, token);
+
+    res.json({
+      success: true,
+      message: "Token enviado com sucesso",
+    });
+  } catch (err) {
+    console.error("Erro ao enviar token de primeiro login:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/auth/change-password-first-login", async (req, res) => {
+  const { idutilizador, passwordNova } = req.body;
+
+  if (!idutilizador || !passwordNova) {
+    return res.status(400).json({ error: "idutilizador e passwordNova são obrigatórios" });
+  }
+
+  if (String(passwordNova).length < 6) {
+    return res.status(400).json({ error: "A nova password deve ter pelo menos 6 caracteres" });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM utilizadores WHERE idutilizador = $1",
+      [idutilizador]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    const novoHash = await bcrypt.hash(passwordNova, 10);
+
+    await pool.query(
+      "UPDATE utilizadores SET passwordhash = $1, primeirologin = FALSE WHERE idutilizador = $2",
+      [novoHash, idutilizador]
+    );
+
+    res.json({
+      success: true,
+      message: "Password alterada com sucesso",
+    });
+  } catch (err) {
+    console.error("Erro ao alterar password do primeiro login:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/logout", (req, res) => {
   res.json({ success: true, message: "Sessão terminada" });
 });
@@ -1244,6 +1616,8 @@ app.post('/utilizadores/:id/notificacoes-expiracao', async (req, res) => {
         INSERT INTO notificacoes (idutilizador, titulo, mensagem, lido, dataenvio, tipo)
         VALUES ($1, $2, $3, FALSE, NOW(), 'PUSH')
       `, [userId, titulo, mensagem]);
+
+      await enviarPush(userId, titulo, mensagem);
 
       criadas++;
     }
@@ -1586,6 +1960,68 @@ app.post('/utilizadores/:id/lembretes', async (req, res) => {
   }
 });
 
+// POST /utilizadores/:id/notificacoes-lembretes
+// Cria notificações (in-app + push) para lembretes próximos do prazo
+// (mesmo padrão de /utilizadores/:id/notificacoes-expiracao).
+app.post('/utilizadores/:id/notificacoes-lembretes', async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (isNaN(userId)) return res.status(400).json({ error: 'ID inválido' });
+
+  try {
+    const { rows: lembretes } = await pool.query(`
+      SELECT id, titulo, prazo
+      FROM lembretes
+      WHERE utilizador_id = $1
+        AND concluido = FALSE
+        AND prazo <= NOW() + INTERVAL '3 days'
+    `, [userId]);
+
+    const hoje = new Date();
+    let criadas = 0;
+
+    for (const lembrete of lembretes) {
+      const prazo = new Date(lembrete.prazo);
+      const diasRestantes = Math.floor((prazo - hoje) / (1000 * 60 * 60 * 24));
+
+      // Deduplicação: não criar se já existe notificação deste lembrete nas últimas 24h
+      const { rows: existing } = await pool.query(`
+        SELECT 1 FROM notificacoes
+        WHERE idutilizador = $1
+          AND mensagem LIKE $2
+          AND dataenvio >= NOW() - INTERVAL '1 day'
+        LIMIT 1
+      `, [userId, `%${lembrete.titulo}%`]);
+
+      if (existing.length > 0) continue;
+
+      let mensagem;
+      if (diasRestantes < 0) {
+        mensagem = `⏰ O lembrete "${lembrete.titulo}" está atrasado há ${-diasRestantes} dia(s).`;
+      } else if (diasRestantes === 0) {
+        mensagem = `⏰ O lembrete "${lembrete.titulo}" é para hoje!`;
+      } else {
+        mensagem = `⏰ O lembrete "${lembrete.titulo}" é em ${diasRestantes} dia(s).`;
+      }
+
+      const titulo = '⏰ Lembrete Próximo';
+
+      await pool.query(`
+        INSERT INTO notificacoes (idutilizador, titulo, mensagem, lido, dataenvio, tipo)
+        VALUES ($1, $2, $3, FALSE, NOW(), 'PUSH')
+      `, [userId, titulo, mensagem]);
+
+      await enviarPush(userId, titulo, mensagem);
+
+      criadas++;
+    }
+
+    res.json({ success: true, criadas });
+  } catch (err) {
+    console.error('Erro ao criar notificações de lembretes:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.patch('/lembretes/:id/concluir', async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
@@ -1613,7 +2049,8 @@ app.delete('/lembretes/:id', async (req, res) => {
 // ─────────────────────────────────────────────────────────
 // START
 // ─────────────────────────────────────────────────────────
-app.listen(3000, "0.0.0.0", () => {
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, "0.0.0.0", () => {
   const c = {
     reset:   '\x1b[0m',
     bold:    '\x1b[1m',

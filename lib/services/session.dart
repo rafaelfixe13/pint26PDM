@@ -3,12 +3,14 @@ class Session {
   static bool lembretesMostrados = false;
   static bool marcosVerificados = false;
   static bool expiracaoVerificada = false;
+  static bool rgpdVerificado = false;
 
   static void iniciar(Map<String, dynamic> user) {
     utilizador = Map<String, dynamic>.from(user);
     lembretesMostrados = false;
     marcosVerificados = false;
     expiracaoVerificada = false;
+    rgpdVerificado = false;
   }
 
   static void terminar() {
@@ -16,6 +18,7 @@ class Session {
     lembretesMostrados = false;
     marcosVerificados = false;
     expiracaoVerificada = false;
+    rgpdVerificado = false;
   }
 
   static int get id => int.tryParse('${utilizador['idutilizador'] ?? 0}') ?? 0;

@@ -33,27 +33,39 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  void _voltar() {
+    
+      context.go('/main');
+    
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E3A5F),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.canPop() ? context.pop() : context.go('/main'),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _voltar();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF1E3A5F),
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: _voltar,
+          ),
+          title: const Text(
+            'Learning Path',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
         ),
-        title: const Text(
-          'Learning Path',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _erro != null
+                ? _buildErro()
+                : RefreshIndicator(onRefresh: _carregar, child: _buildContent()),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _erro != null
-              ? _buildErro()
-              : RefreshIndicator(onRefresh: _carregar, child: _buildContent()),
     );
   }
 

@@ -71,7 +71,7 @@ class _CalendarioPageState extends State<CalendarioPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.canPop() ? context.pop() : context.go('/main'),
+          onPressed: () => context.go('/main'),
         ),
         title: const Text('Calendário',
             style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),

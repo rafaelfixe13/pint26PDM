@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/cache_service.dart';
+import '../services/expiracao_service.dart';
 import '../widgets/base64_image_widget.dart';
 import 'package:go_router/go_router.dart';
 
@@ -15,14 +16,14 @@ class _BadgesPageState extends State<BadgesPage> {
   late Future<List<dynamic>> _nivelsFuture;
   late Future<List<dynamic>> _especiaisFuture;
 
-  List<dynamic> _todos = [];       // lista completa da API
-  List<dynamic> _visiveis = [];    // lista filtrada + lazy
-  List<dynamic> _filtrados = [];   // lista após pesquisa
-  List<dynamic> _areas = [];       // lista de áreas
-  List<dynamic> _niveis = [];      // lista de níveis
-  List<dynamic> _especiais = [];   // lista de especiais
+  List<dynamic> _todos = []; // lista completa da API
+  List<dynamic> _visiveis = []; // lista filtrada + lazy
+  List<dynamic> _filtrados = []; // lista após pesquisa
+  List<dynamic> _areas = []; // lista de áreas
+  List<dynamic> _niveis = []; // lista de níveis
+  List<dynamic> _especiais = []; // lista de especiais
 
-  final int _porPagina = 6;        // quantos carregar de cada vez
+  final int _porPagina = 6; // quantos carregar de cada vez
   int _carregados = 0;
   bool _temMais = false;
 
@@ -62,12 +63,14 @@ class _BadgesPageState extends State<BadgesPage> {
   }
 
   void _loadData() {
-  setState(() {
-    _badgesFuture = CacheService.getBadgesDoUtilizador(); // antes: ApiService.getBadgesDoUtilizador()
-    _areasFuture = CacheService.getAreas(); // antes: ApiService.getAreas()
-    _nivelsFuture = CacheService.getNiveis(); // antes: ApiService.getNiveis()
-    _especiaisFuture = CacheService.getEspeciais(); // antes: ApiService.getEspeciais()
-  });
+    setState(() {
+      _badgesFuture = CacheService
+          .getBadgesDoUtilizador(); // antes: ApiService.getBadgesDoUtilizador()
+      _areasFuture = CacheService.getAreas(); // antes: ApiService.getAreas()
+      _nivelsFuture = CacheService.getNiveis(); // antes: ApiService.getNiveis()
+      _especiaisFuture =
+          CacheService.getEspeciais(); // antes: ApiService.getEspeciais()
+    });
     _badgesFuture.then((lista) {
       setState(() {
         _todos = lista;
@@ -185,19 +188,24 @@ class _BadgesPageState extends State<BadgesPage> {
                 Expanded(
                   child: DropdownButtonFormField<int?>(
                     value: _selectedNivel,
+                    isExpanded: true,
                     decoration: InputDecoration(
                       labelText: 'Nível',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     items: [
                       DropdownMenuItem<int?>(value: null, child: Text('Todos')),
                       ..._niveis.map((nivel) => DropdownMenuItem<int?>(
-                        value: nivel['idnivel'],
-                        child: Text(nivel['nome'] ?? 'Nível ${nivel['idnivel']}'),
-                      )),
+                            value: nivel['idnivel'],
+                            child: Text(
+                              nivel['nome'] ?? 'Nível ${nivel['idnivel']}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )),
                     ],
                     onChanged: (value) {
                       setState(() => _selectedNivel = value);
@@ -210,19 +218,25 @@ class _BadgesPageState extends State<BadgesPage> {
                 Expanded(
                   child: DropdownButtonFormField<String?>(
                     value: _selectedArea,
+                    isExpanded: true,
                     decoration: InputDecoration(
                       labelText: 'Área',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     items: [
-                      DropdownMenuItem<String?>(value: null, child: Text('Todas')),
+                      DropdownMenuItem<String?>(
+                          value: null, child: Text('Todas')),
                       ..._areas.map((area) => DropdownMenuItem<String?>(
-                        value: area['idarea'].toString(),
-                        child: Text(area['nome'] ?? 'Sem nome'),
-                      )),
+                            value: area['idarea'].toString(),
+                            child: Text(
+                              area['nome'] ?? 'Sem nome',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )),
                     ],
                     onChanged: (value) {
                       setState(() => _selectedArea = value);
@@ -241,19 +255,25 @@ class _BadgesPageState extends State<BadgesPage> {
                 Expanded(
                   child: DropdownButtonFormField<int?>(
                     value: _selectedEspecial,
+                    isExpanded: true,
                     decoration: InputDecoration(
                       labelText: 'Especial',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     items: [
                       DropdownMenuItem<int?>(value: null, child: Text('Todos')),
                       ..._especiais.map((especial) => DropdownMenuItem<int?>(
-                        value: especial['idespecial'],
-                        child: Text(especial['nome'] ?? 'Especial ${especial['idespecial']}'),
-                      )),
+                            value: especial['idespecial'],
+                            child: Text(
+                              especial['nome'] ??
+                                  'Especial ${especial['idespecial']}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )),
                     ],
                     onChanged: (value) {
                       setState(() => _selectedEspecial = value);
@@ -305,7 +325,8 @@ class _BadgesPageState extends State<BadgesPage> {
                         Center(
                           child: Column(
                             children: [
-                              Icon(Icons.search_off, size: 48, color: Colors.grey),
+                              Icon(Icons.search_off,
+                                  size: 48, color: Colors.grey),
                               SizedBox(height: 8),
                               Text(
                                 'Nenhum badge encontrado',
@@ -336,7 +357,7 @@ class _BadgesPageState extends State<BadgesPage> {
                       crossAxisCount: 2,
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 12,
-                      childAspectRatio: 0.58,
+                      mainAxisExtent: 250,
                     ),
                     itemCount: _visiveis.length + (_temMais ? 1 : 0),
                     itemBuilder: (context, index) {
@@ -392,118 +413,134 @@ class _BadgeCard extends StatelessWidget {
         int.tryParse(badge['progresso_atual']?.toString() ?? '0') ?? 0;
     final int total =
         int.tryParse(badge['progresso_total']?.toString() ?? '0') ?? 0;
+    final expList = ExpiracaoService.calcular([badge]);
+    final BadgeExpiracao? expiracao = expList.isEmpty ? null : expList.first;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)],
-      ),
-      padding: EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          badge['imagemurl'] != null &&
-                  badge['imagemurl'].toString().isNotEmpty
-              ? Base64ImageWidget(
-                  imageData: badge['imagemurl']
-                      .toString()
-                      .replaceAll('localhost', '10.0.2.2')
-                      .replaceAll('127.0.0.1', '10.0.2.2')
-                      .replaceAll('100.105.58.22', '10.0.2.2')
-                      .replaceAll('0.0.0.0', '10.0.2.2'),
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.contain,
-                  errorWidget: Icon(Icons.emoji_events,
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)],
+          ),
+          padding: EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              badge['imagemurl'] != null &&
+                      badge['imagemurl'].toString().isNotEmpty
+                  ? Base64ImageWidget(
+                      imageData: badge['imagemurl']
+                          .toString()
+                          .replaceAll('localhost', '10.0.2.2')
+                          .replaceAll('127.0.0.1', '10.0.2.2')
+                          .replaceAll('100.105.58.22', '10.0.2.2')
+                          .replaceAll('0.0.0.0', '10.0.2.2'),
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.contain,
+                      errorWidget: Icon(Icons.emoji_events,
+                          size: 80, color: Color(0xFF2563EB)),
+                    )
+                  : Icon(Icons.emoji_events,
                       size: 80, color: Color(0xFF2563EB)),
-                )
-              : Icon(Icons.emoji_events, size: 80, color: Color(0xFF2563EB)),
-
-          SizedBox(height: 8),
-
-          Text(
-            badge['nome'] ?? '',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2563EB),
-                fontSize: 13),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-
-          SizedBox(height: 4),
-
-          Text(
-            badge['descricao'] ?? '',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 10, color: Colors.grey),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-
-          SizedBox(height: 8),
-
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(999)),
-                child: Text(
-                  _getNivelNome(badge['idnivel']),
-                  style: TextStyle(color: Colors.white, fontSize: 10),
-                ),
+              SizedBox(height: 8),
+              Text(
+                badge['nome'] ?? '',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2563EB),
+                    fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              SizedBox(width: 6),
-              Icon(Icons.star, size: 12, color: Colors.amber),
-              SizedBox(width: 2),
-              Text('${badge['pontos'] ?? 0} pts',
-                  style: TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.bold)),
+              SizedBox(height: 4),
+              Text(
+                badge['descricao'] ?? '',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10, color: Colors.grey),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(999)),
+                    child: Text(
+                      _getNivelNome(badge['idnivel']),
+                      style: TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Icon(Icons.star, size: 12, color: Colors.amber),
+                  SizedBox(width: 2),
+                  Text('${badge['pontos'] ?? 0} pts',
+                      style:
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Progresso',
+                      style: TextStyle(fontSize: 9, color: Colors.grey)),
+                  Text('$atual/$total',
+                      style: TextStyle(fontSize: 9, color: Colors.grey)),
+                ],
+              ),
+              SizedBox(height: 4),
+              LinearProgressIndicator(
+                value: total > 0 ? (atual / total).clamp(0.0, 1.0) : 0,
+                backgroundColor: Color(0xFFE5E7EB),
+                color: Color(0xFF2563EB),
+                minHeight: 4,
+              ),
             ],
           ),
-
-          SizedBox(height: 8),
-
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text('REQUISITOS',
-                style: TextStyle(fontSize: 9, color: Colors.grey)),
+        ),
+        if (expiracao != null)
+          Positioned(
+            top: 6,
+            right: 6,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: expiracao.cor,
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    expiracao.expirado
+                        ? Icons.error_outline
+                        : Icons.access_time_outlined,
+                    size: 11,
+                    color: Colors.white,
+                  ),
+                  SizedBox(width: 3),
+                  Text(
+                    expiracao.expirado
+                        ? 'Expirado'
+                        : '${expiracao.diasRestantes}d',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
           ),
-          SizedBox(height: 4),
-          Row(
-            children: [
-              _icon(Icons.emoji_events, Colors.orange),
-              SizedBox(width: 4),
-              _icon(Icons.star, Colors.red),
-              SizedBox(width: 4),
-              _icon(Icons.description, Colors.grey),
-            ],
-          ),
-
-          SizedBox(height: 8),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Progresso',
-                  style: TextStyle(fontSize: 9, color: Colors.grey)),
-              Text('$atual/$total',
-                  style: TextStyle(fontSize: 9, color: Colors.grey)),
-            ],
-          ),
-          SizedBox(height: 4),
-          LinearProgressIndicator(
-            value: total > 0 ? (atual / total).clamp(0.0, 1.0) : 0,
-            backgroundColor: Color(0xFFE5E7EB),
-            color: Color(0xFF2563EB),
-            minHeight: 4,
-          ),
-        ],
-      ),
+      ],
     );
   }
 

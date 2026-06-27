@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/cache_service.dart';
+import '../services/expiracao_service.dart';
 import '../widgets/base64_image_widget.dart';
 
 class CandidaturasPage extends StatefulWidget {
@@ -70,6 +71,36 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
 
   void _abrirBadge(dynamic candidatura) {
     context.go('/badge_detail', extra: {'badge': candidatura, 'candidatura': candidatura});
+  }
+
+  Widget _buildRibbonExpiracao(BadgeExpiracao expiracao) {
+    return Positioned(
+      top: 6,
+      right: 6,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: expiracao.cor,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              expiracao.expirado ? Icons.error_outline : Icons.access_time_outlined,
+              size: 11,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              expiracao.expirado ? 'Expirado' : '${expiracao.diasRestantes}d',
+              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildEstadoChip(String estado) {
@@ -240,10 +271,14 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
                 final data = _formatarData(
                   candidatura['datasubmissao'] ?? candidatura['datacriacao'],
                 );
+                final expList = ExpiracaoService.calcular([candidatura]);
+                final BadgeExpiracao? expiracao = expList.isEmpty ? null : expList.first;
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: Material(
+                  child: Stack(
+                    children: [
+                    Material(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     elevation: 2,
@@ -382,6 +417,9 @@ class _CandidaturasPageState extends State<CandidaturasPage> {
                         ),
                       ),
                     ),
+                    ),
+                    if (expiracao != null) _buildRibbonExpiracao(expiracao),
+                    ],
                   ),
                 );
               },

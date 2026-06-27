@@ -30,6 +30,7 @@ class _MainPageState extends State<MainPage> {
     super.initState();
     _loadData();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _verificarRgpd();
       Future.delayed(const Duration(milliseconds: 600), () {
         if (mounted) _verificarLembretes();
       });
@@ -40,6 +41,50 @@ class _MainPageState extends State<MainPage> {
         if (mounted) _verificarExpiracao();
       });
     });
+  }
+
+  Future<void> _verificarRgpd() async {
+    if (Session.rgpdVerificado) return;
+    Session.rgpdVerificado = true;
+    if (Session.utilizador['rgpd'] == true) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          const Icon(Icons.privacy_tip_outlined, color: Color(0xFF2563EB)),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text('Consentimento RGPD', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+        ]),
+        content: const Text(
+          'Para podermos partilhar os teus badges (ex: LinkedIn, certificados) e cumprir o RGPD, '
+          'precisamos do teu consentimento explícito para o tratamento destes dados. '
+          'Podes alterar esta escolha a qualquer momento em Definições.',
+          style: TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Não aceito'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final novoValor = await ApiService.atualizarRgpd(true);
+                Session.utilizador['rgpd'] = novoValor;
+              } catch (_) {}
+            },
+            child: const Text('Aceito', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _verificarExpiracao() async {
@@ -131,6 +176,8 @@ class _MainPageState extends State<MainPage> {
   Future<void> _verificarLembretes() async {
     if (Session.lembretesMostrados) return;
     Session.lembretesMostrados = true;
+    // Cria notificações + push no servidor para lembretes próximos do prazo
+    await ApiService.verificarLembretesNotificacoes(Session.id);
     final proximos = await LembretesService.verificarProximos(diasAntecedencia: 3);
     if (proximos.isEmpty || !mounted) return;
 
@@ -723,6 +770,7 @@ class _MainPageState extends State<MainPage> {
                                         child: _miniCard(
                                           c,
                                           showProgress: true,
+                                          mostrarExpiracao: true,
                                           onTap: () => context.push(
                                             '/badge_detail',
                                             extra: {
@@ -774,7 +822,7 @@ class _MainPageState extends State<MainPage> {
 
                           // Seção de Badges Recomendados
                           const Text(
-                            'Badges Recomendados para a tua Área',
+                            'Badges Recomendados',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -1125,12 +1173,18 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _miniCard(dynamic badge,
-      {required bool showProgress, VoidCallback? onTap}) {
+      {required bool showProgress, VoidCallback? onTap, bool mostrarExpiracao = false}) {
     final int atual =
         int.tryParse(badge?['progresso_atual']?.toString() ?? '0') ?? 0;
     final int total =
         int.tryParse(badge?['progresso_total']?.toString() ?? '0') ?? 0;
     final double pct = total > 0 ? (atual / total).clamp(0.0, 1.0) : 0.5;
+
+    BadgeExpiracao? expiracao;
+    if (mostrarExpiracao && badge != null) {
+      final expList = ExpiracaoService.calcular([badge]);
+      if (expList.isNotEmpty) expiracao = expList.first;
+    }
 
     final card = Container(
       padding: const EdgeInsets.all(16),
@@ -1193,6 +1247,24 @@ class _MainPageState extends State<MainPage> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
+          if (expiracao != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Expira em:',
+              style: TextStyle(
+                fontSize: 9,
+                color: Colors.grey[600],
+              ),
+            ),
+            Text(
+              expiracao.expirado ? 'Expirado' : '${expiracao.diasRestantes}d',
+              style: TextStyle(
+                fontSize: 11,
+                color: expiracao.cor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           if (showProgress) ...[
             const SizedBox(height: 10),
             Container(
@@ -1225,6 +1297,41 @@ class _MainPageState extends State<MainPage> {
       ),
     );
 
-    return onTap != null ? GestureDetector(onTap: onTap, child: card) : card;
+    final content = expiracao == null
+        ? card
+        : Stack(
+            children: [
+              card,
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: expiracao.cor,
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        expiracao.expirado ? Icons.error_outline : Icons.access_time_outlined,
+                        size: 11,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        expiracao.expirado ? 'Expirado' : '${expiracao.diasRestantes}d',
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+
+    return onTap != null ? GestureDetector(onTap: onTap, child: content) : content;
   }
 }

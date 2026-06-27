@@ -5,8 +5,10 @@ import 'dart:io';
 import 'dart:convert';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../services/expiracao_service.dart';
 import '../services/lembretes_service.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_file/open_file.dart';
 import 'package:share_plus/share_plus.dart';
@@ -127,7 +129,7 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.canPop() ? context.pop() : context.go('/badges'),
+          onPressed: () => context.go('/badges'),
         ),
         actions: [
           IconButton(
@@ -475,6 +477,9 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
 
   Widget _buildCandidaturaStatus() {
     final candidatura = widget.candidatura;
+    final badge = _badge ?? widget.badge;
+    final expList = ExpiracaoService.calcular([badge]);
+    final BadgeExpiracao? expiracao = expList.isEmpty ? null : expList.first;
     return Column(
       children: [
         Container(
@@ -502,6 +507,26 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
                 Text(
                   'Submetido em: ${candidatura['datasubmissao'].toString().split('T').first}',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+              if (expiracao != null) ...[
+                SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      expiracao.expirado ? Icons.error_outline : Icons.access_time_outlined,
+                      size: 14,
+                      color: expiracao.cor,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      expiracao.expirado
+                          ? 'Expira em: Expirado'
+                          : 'Expira em: ${expiracao.diasRestantes}d',
+                      style: TextStyle(
+                          fontSize: 12, color: expiracao.cor, fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -853,8 +878,13 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
       // Android: tentar guardar diretamente na pasta Downloads visível
       if (Platform.isAndroid) {
         try {
+          var status = await Permission.manageExternalStorage.status;
+          if (!status.isGranted) {
+            status = await Permission.manageExternalStorage.request();
+          }
+
           final downloadsDir = Directory('/storage/emulated/0/Download');
-          if (await downloadsDir.exists()) {
+          if (status.isGranted && await downloadsDir.exists()) {
             final file = File('${downloadsDir.path}/$fileName');
             await file.writeAsBytes(pdfBytes);
             if (mounted) {

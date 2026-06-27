@@ -37,7 +37,7 @@ class _LembretesPageState extends State<LembretesPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.canPop() ? context.pop() : context.go('/main'),
+          onPressed: () =>  context.go('/main'),
         ),
         title: const Text('Lembretes',
             style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),

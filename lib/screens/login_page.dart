@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+import '../services/first_login_service.dart';
+import '../services/basededados.dart';
 import 'package:go_router/go_router.dart';
 import '../services/cache_service.dart';
 import '../services/session.dart';
+import '../services/push_notification_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -22,54 +28,106 @@ class _LoginPageState extends State<LoginPage> {
     _passwordController.dispose();
     super.dispose();
   }
-
   Future<void> _login() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-
-    if (email.isEmpty || password.isEmpty) {
-      setState(() => _erro = 'Preenche o email e a password');
-      return;
-    }
-    if (!email.contains('@')) {
-      setState(() => _erro = 'Email inválido');
-      return;
-    }
-
     setState(() {
       _loading = true;
       _erro = null;
     });
 
     try {
-      // Usa o CacheService → tenta API e guarda em SQLite,
-      // ou faz fallback para sessão local em modo offline.
-      final resultado = await CacheService.login(email, password);
+      final response = await http.post(
+        Uri.parse('${FirstLoginService.baseUrl}/login'),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': _emailController.text.trim(),
+          'password': _passwordController.text,
+        }),
+      );
 
-      // guarda o utilizador na session em memória
-      Session.iniciar(resultado['utilizador']);
+      final decoded = response.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body) as Map<String, dynamic>;
 
-      // Aviso opcional: se entrou em modo offline
-      if (resultado['offline'] == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Entraste em modo offline (sem ligação ao servidor).'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
-          ),
+      if (!mounted) {
+        return;
+      }
+
+      if (response.statusCode == 200) {
+        final utilizador = _extractUser(decoded);
+        final emailConfirmado = utilizador['emailconfirmado'] == true;
+        final idutilizador = utilizador['idutilizador'];
+
+        if (emailConfirmado == false && idutilizador is int) {
+          await FirstLoginService.sendFirstLoginToken(idutilizador);
+
+          if (!mounted) {
+            return;
+          }
+
+          context.go('/first-login-token', extra: {
+            'idutilizador': idutilizador,
+            'nome': utilizador['nome']?.toString(),
+            'email': utilizador['email']?.toString(),
+          });
+          return;
+        }
+
+        Session.iniciar(utilizador);
+        await Basededados().guardarSessao(
+          utilizador,
+          CacheService.hashPassword(_passwordController.text),
         );
+        await PushNotificationService.instance.registarTokenServidor();
+
+        if (!mounted) return;
+        context.go('/main');
+        return;
       }
 
-      if (mounted) {
-        context.go('/main');
+      if (response.statusCode == 403 && decoded['requireFirstLoginToken'] == true) {
+        final idutilizador = decoded['idutilizador'];
+        if (idutilizador is int) {
+          await FirstLoginService.sendFirstLoginToken(idutilizador);
+          if (!mounted) {
+            return;
+          }
+
+          context.go('/first-login-token', extra: {
+            'idutilizador': idutilizador,
+            'nome': decoded['nome']?.toString(),
+            'email': decoded['email']?.toString(),
+          });
+          return;
+        }
       }
-    } catch (e) {
+
       setState(() {
-        _erro = e.toString().replaceAll('Exception: ', '');
+        _erro = decoded['error']?.toString() ?? 'Credenciais inválidas';
+      });
+    } catch (err) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _erro = err.toString();
       });
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
+  }
+
+  Map<String, dynamic> _extractUser(Map<String, dynamic> decoded) {
+    final utilizador = decoded['utilizador'];
+    if (utilizador is Map<String, dynamic>) {
+      return utilizador;
+    }
+
+    return decoded;
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '/screens/about_page.dart';
 import '/screens/badge_detail_page.dart';
@@ -15,8 +16,16 @@ import 'screens/change_password.dart';
 import 'screens/lembretes_page.dart';
 import 'screens/calendario_page.dart';
 import 'screens/dashboard_page.dart';
+import 'screens/first_login_token_page.dart';
+import 'screens/first_login_change_password_page.dart';
+import 'screens/check_email_page.dart';
+
+// Chave global do Navigator, usada pelo PushNotificationService para mostrar
+// popups/navegar a partir de notificações recebidas fora do contexto de build.
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final GoRouter router = GoRouter(
+  navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   routes: [
     GoRoute(
@@ -95,6 +104,30 @@ final GoRouter router = GoRouter(
     GoRoute(
       path: '/dashboard',
       builder: (context, state) => const DashboardPage(),
+    ),
+    GoRoute(
+      path: '/first-login-token',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return FirstLoginTokenPage(
+          idutilizador: extra['idutilizador'] as int,
+          nome: extra['nome'] as String?,
+          email: extra['email'] as String?,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/first-login-change-password',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return FirstLoginChangePasswordPage(
+          idutilizador: extra['idutilizador'] as int,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/check-email',
+      builder: (context, state) => const CheckEmailPage(),
     ),
   ],
 );

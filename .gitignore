@@ -50,6 +50,9 @@ app.*.map.json
 node_modules/
 lib/node_modules/
 
+# Ficheiros enviados pelos utilizadores em runtime (evidências de candidaturas)
+uploads/
+
 # Flutter platform folders
 android/
 ios/
@@ -73,3 +76,6 @@ analysis_options.yaml
 local.properties
 .env
 .env.local
+
+# Firebase Admin SDK service account (secret, never commit)
+firebase-service-account.json
