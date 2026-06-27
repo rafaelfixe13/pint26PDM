@@ -1,3 +1,5 @@
+import 'basededados.dart';
+
 class Session {
   static Map<String, dynamic> utilizador = {};
   static bool lembretesMostrados = false;
@@ -27,4 +29,13 @@ class Session {
   static String get fotoUrl => utilizador['fotourl']?.toString() ?? '';
   static int get pontos => int.tryParse('${utilizador['pontos'] ?? 0}') ?? 0;
   static int get idArea => int.tryParse('${utilizador['idarea'] ?? 0}') ?? 0;
+
+  // Atualiza o RGPD em memória e persiste no cache local (com o mesmo hash
+  // de password já guardado), para a escolha sobreviver a um reinício da app.
+  static Future<void> atualizarRgpdPersistente(bool valor) async {
+    utilizador['rgpd'] = valor;
+    final sessaoLocal = await Basededados().obterSessaoLocal();
+    final pwHash = sessaoLocal?['_pw_hash']?.toString() ?? '';
+    await Basededados().guardarSessao(utilizador, pwHash);
+  }
 }

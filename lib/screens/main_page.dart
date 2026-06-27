@@ -77,7 +77,7 @@ class _MainPageState extends State<MainPage> {
               Navigator.pop(ctx);
               try {
                 final novoValor = await ApiService.atualizarRgpd(true);
-                Session.utilizador['rgpd'] = novoValor;
+                await Session.atualizarRgpdPersistente(novoValor);
               } catch (_) {}
             },
             child: const Text('Aceito', style: TextStyle(color: Colors.white)),

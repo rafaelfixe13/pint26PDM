@@ -31,6 +31,7 @@ class _OptionsPageState extends State<OptionsPage> {
 
     try {
       final novoValor = await ApiService.atualizarRgpd(value);
+      await Session.atualizarRgpdPersistente(novoValor);
 
       if (!mounted) return;
       setState(() {
