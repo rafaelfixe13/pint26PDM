@@ -88,6 +88,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Endereço público onde este servidor está acessível (usado para gerar URLs
+// de ficheiros enviados). Local/Tailscale por defeito; no Render define-se
+// PUBLIC_BASE_URL=https://pint26pdm-api.onrender.com nas environment variables.
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "http://100.102.17.64:3000";
+
 // ─── BASE DE DADOS ───────────────────────────────────────
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -812,7 +817,7 @@ app.post("/candidaturas", upload.any(), async (req, res) => {
         `,
         [
           idCandidaturaReq,
-          `http://100.105.58.22:3000/uploads/candidaturas/${file.filename}`,
+          `${PUBLIC_BASE_URL}/uploads/candidaturas/${file.filename}`,
           file.originalname,
         ]
       );
@@ -1038,7 +1043,7 @@ app.patch("/utilizadores/:id/foto", upload.single("foto"), async (req, res) => {
       return res.status(400).json({ error: "Nenhuma imagem enviada" });
     }
 
-    const fotoUrl = `http://100.105.58.22:3000/uploads/candidaturas/${req.file.filename}`;
+    const fotoUrl = `${PUBLIC_BASE_URL}/uploads/candidaturas/${req.file.filename}`;
 
     await pool.query(
       "UPDATE utilizadores SET fotourl = $1 WHERE idutilizador = $2",

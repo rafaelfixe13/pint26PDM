@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import '../services/session.dart';
 
 class ApiService {
-  static const String baseUrl = "http://100.102.17.64:3000";
+  static const String baseUrl = "https://pint26pdm-api.onrender.com";
   static const _timeout = Duration(seconds: 10);
 
   static Future<http.Response> _get(Uri uri, {Map<String, String>? headers}) async {
