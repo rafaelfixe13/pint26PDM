@@ -743,4 +743,30 @@ class ApiService {
       throw Exception('Sem ligação ao servidor. Verifica a tua ligação à VPN/WiFi.');
     }
   }
+
+  /// Gera (ou obtém em cache) a imagem PNG do badge e o PDF do certificado.
+  /// Devolve { base64, certificado_pdf_base64 }.
+  static Future<Map<String, dynamic>> gerarCertificado(int badgeId) async {
+    final userId = Session.id;
+    if (userId == 0) {
+      throw Exception('Sessão inválida. Faz login novamente.');
+    }
+
+    final response = await _post(
+      Uri.parse('$baseUrl/badges/$badgeId/generate-image'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({'user_id': userId}),
+    );
+
+    if (response.statusCode == 200) {
+      return _decodeJsonSafely(response) as Map<String, dynamic>;
+    }
+
+    throw Exception(
+      _extractErrorMessage(response, fallback: 'Erro ao gerar certificado'),
+    );
+  }
 }

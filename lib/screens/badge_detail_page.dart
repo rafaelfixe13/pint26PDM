@@ -155,6 +155,11 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
               onPressed: _partilharCertificado,
             ),
           ],
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf, color: Colors.black),
+            onPressed: _partilharCertificado,
+            tooltip: 'Partilhar Certificado',
+          ),
         ],
       ),
       body: Column(
@@ -474,6 +479,59 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _shareBadgeImageLinkedIn() async {
+    try {
+      final badge = _badge ?? widget.badge;
+      final badgeId = badge['idbadge'] ?? badge['id'] ?? badge['badge_id'];
+
+      if (badgeId == null) {
+        throw Exception('ID do badge inválido');
+      }
+
+      // Show loading
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      // Call server to generate image (returns base64 + certificado_pdf_base64)
+      final result = await ApiService.gerarCertificado(badgeId as int);
+      final base64str = result['base64'] as String?;
+
+      if (base64str == null || base64str.isEmpty) {
+        throw Exception('Imagem não recebida do servidor');
+      }
+
+      final bytes = base64.decode(base64str);
+
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'badge_${badgeId}_${DateTime.now().millisecondsSinceEpoch}.png';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(bytes);
+
+      if (mounted) Navigator.pop(context);
+
+      // Use share sheet (Share Plus). The user can pick LinkedIn.
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'image/png')],
+          text: '🎉 Conquistei o badge "${badge['nome']}"! #SoftinsaTalent',
+          subject: 'Badge: ${badge['nome']}',
+        ),
+      );
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao partilhar no LinkedIn: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Widget _buildCandidaturaStatus() {
@@ -843,24 +901,6 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
   }
 
   Future<void> _guardarCertificado() async {
-    final badge = _badge ?? widget.badge;
-
-    if (badge?['certificado'] == null || (badge['certificado'] as String).isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Certificado não disponível')),
-      );
-      return;
-    }
-
-    final String certificadoBase64 = badge['certificado'];
-    if (!certificadoBase64.startsWith('JVBERi')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Formato de certificado inválido'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-
     if (mounted) {
       showDialog(
         context: context,
@@ -870,7 +910,19 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
     }
 
     try {
-      final pdfBytes = base64Decode(certificadoBase64);
+      final pdfBase64 = await _obterCertificadoPdfBase64();
+      if (pdfBase64 == null) {
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Certificado não disponível')),
+          );
+        }
+        return;
+      }
+
+      final pdfBytes = base64Decode(pdfBase64);
+      final badge = _badge ?? widget.badge;
       final badgeName = (badge['nome'] ?? 'Certificado') as String;
       final safeFileName =
           badgeName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_').trim();
@@ -1052,83 +1104,46 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
     );
   }
 
-  Future<void> _shareBadgeImageLinkedIn() async {
+  /// Obtém o PDF base64 do certificado (a partir do badge, candidatura, ou servidor).
+  Future<String?> _obterCertificadoPdfBase64() async {
     final badge = _badge ?? widget.badge;
-    final badgeId = badge?['idbadge'] ?? badge?['id'] ?? badge?['badge_id'];
 
-    if (badgeId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ID do badge inválido')),
-      );
-      return;
+    // 1. Tentar certificado_pdf_base64 da candidatura (personalizado)
+    if (badge?['certificado_pdf_base64'] != null &&
+        (badge['certificado_pdf_base64'] as String).isNotEmpty) {
+      return badge['certificado_pdf_base64'] as String;
     }
 
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
-      );
+    // 2. Tentar certificado genérico do badge (campo estático na BD)
+    if (badge?['certificado'] != null && (badge['certificado'] as String).isNotEmpty) {
+      final cert = badge['certificado'] as String;
+      final extracted = extractBase64Pdf(cert);
+      if (extracted != null) return extracted;
     }
 
-    try {
-      final userId = Session.id;
-      final uri = Uri.parse('${ApiService.baseUrl}/badges/$badgeId/generate-image');
-      final resp = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_id': userId}),
-      );
-
-      if (resp.statusCode != 200) {
-        throw Exception('Erro ao gerar imagem: ${resp.statusCode}');
-      }
-
-      final data = jsonDecode(resp.body);
-      final base64str = data['base64'] as String?;
-      if (base64str == null || base64str.isEmpty) {
-        throw Exception('Imagem não recebida do servidor');
-      }
-
-      final bytes = base64Decode(base64str);
-      final tempDir = await getTemporaryDirectory();
-      final fileName = 'badge_${badgeId}_${DateTime.now().millisecondsSinceEpoch}.png';
-      final file = File('${tempDir.path}/$fileName');
-      await file.writeAsBytes(bytes);
-
-      if (mounted) Navigator.pop(context);
-
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path, mimeType: 'image/png')],
-          text: '🎉 Conquistei o badge "${badge?['nome']}"! #SoftinsaTalent',
-          subject: 'Badge: ${badge?['nome']}',
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        try { Navigator.pop(context); } catch (_) {}
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao partilhar no LinkedIn: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+    // 3. Fallback: gerar PDF via servidor
+    final badgeId = badge['idbadge'] ?? badge['id'] ?? badge['badge_id'];
+    if (badgeId != null) {
+      try {
+        final result = await ApiService.gerarCertificado(badgeId as int);
+        final pdfBase64 = result['certificado_pdf_base64'] as String?;
+        if (pdfBase64 != null && pdfBase64.isNotEmpty) {
+          // Cache local no badge
+          final badgeMap = _badge ?? widget.badge;
+          if (badgeMap is Map<String, dynamic>) {
+            badgeMap['certificado_pdf_base64'] = pdfBase64;
+          }
+          return pdfBase64;
+        }
+      } catch (_) {
+        // Falha silenciosa — retorna null
       }
     }
+
+    return null;
   }
 
   Future<void> _partilharCertificado() async {
-    final badge = _badge ?? widget.badge;
-    final certificado = badge?['certificado']?.toString() ?? '';
-
-    if (certificado.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Certificado não disponível')),
-      );
-      return;
-    }
-
     if (mounted) {
       showDialog(
         context: context,
@@ -1138,21 +1153,24 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
     }
 
     try {
+      final pdfBase64 = await _obterCertificadoPdfBase64();
+      if (pdfBase64 == null) {
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Certificado não disponível')),
+          );
+        }
+        return;
+      }
+
+      final badge = _badge ?? widget.badge;
       final badgeName = (badge['nome'] ?? 'Certificado') as String;
       final safeFileName = '${badgeName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')}.pdf';
       final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/$safeFileName');
 
-      // Suporta certificado como URL ou como base64
-      if (certificado.startsWith('http')) {
-        final response = await http.get(Uri.parse(certificado));
-        if (response.statusCode != 200) throw Exception('Erro HTTP ${response.statusCode}');
-        await file.writeAsBytes(response.bodyBytes);
-      } else {
-        final base64 = extractBase64Pdf(certificado);
-        if (base64 == null) throw Exception('Formato de certificado inválido');
-        await file.writeAsBytes(base64Decode(base64));
-      }
+      await file.writeAsBytes(base64Decode(pdfBase64));
 
       if (mounted) Navigator.pop(context);
 

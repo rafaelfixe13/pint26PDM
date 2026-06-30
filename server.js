@@ -11,6 +11,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { createCanvas, loadImage } = require('canvas');
+const { jsPDF } = require('jspdf');
 require('dotenv').config();
 const sgMail = require('@sendgrid/mail');
 const { initializeApp: initializeFirebaseApp, cert } = require('firebase-admin/app');
@@ -1735,9 +1736,8 @@ app.post('/badges/:id/generate-image', async (req, res) => {
 
     const base64str = canvas.toBuffer('image/png').toString('base64');
 
-    // Guardar na BD para reutilização
+    // Guardar PNG na BD para reutilização
     try {
-      await pool.query('ALTER TABLE candidaturasbadge ADD COLUMN IF NOT EXISTS badge_image_base64 TEXT');
       await pool.query(
         'UPDATE candidaturasbadge SET badge_image_base64 = $1 WHERE idcandidatura = $2',
         [base64str, candCheck.rows[0].idcandidatura]
@@ -1746,7 +1746,133 @@ app.post('/badges/:id/generate-image', async (req, res) => {
       console.warn('Não foi possível guardar imagem na BD:', e.message);
     }
 
-    return res.json({ base64: base64str });
+    // ── PDF (A4 portrait, mesmo aspeto visual do PNG) ──
+    let pdfBase64 = null;
+    try {
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pw = 210, ph = 297;
+      const margin = 15;
+      const cardW = pw - margin * 2;
+      const cardX = margin;
+      const cardY = 20;
+      const cardH = ph - cardY - 15;
+      const pad = 12;
+      const cxc = cardX + cardW / 2; // centro horizontal do card
+
+      // atalho para retângulo preenchido com cantos arredondados
+      function pdfRr(x, y, w, h, r) {
+        pdf.roundedRect(x, y, w, h, r, r, 'F');
+      }
+
+      // Fundo completo #F0F4FF
+      pdf.setFillColor('#F0F4FF');
+      pdf.rect(0, 0, pw, ph, 'F');
+
+      // Card branco (sombra omitida — jsPDF não suporta transparência)
+      pdf.setFillColor('#FFFFFF');
+      pdfRr(cardX, cardY, cardW, cardH, 4);
+
+      // ── Logo SOFTINSA ──
+      const fs = 22;
+      pdf.setFont('Helvetica', 'bold');
+      pdf.setFontSize(fs);
+      const logoStr = 'SOFTINSA';
+      const totalLW = pdf.getTextWidth(logoStr);
+      let lx2 = cxc - totalLW / 2;
+      const logoY = cardY + pad + fs * 0.8;
+      const logoColors = ['#1E3A5F','#1E3A5F','#1E3A5F','#38BDF8','#1E3A5F','#1E3A5F','#1E3A5F','#1E3A5F'];
+      for (let i = 0; i < logoStr.length; i++) {
+        pdf.setTextColor(logoColors[i]);
+        pdf.text(logoStr[i], lx2, logoY, { baseline: 'alphabetic' });
+        lx2 += pdf.getTextWidth(logoStr[i]);
+      }
+
+      // ── Imagem do badge ──
+      const imgSize = 55;
+      const imgY2 = logoY + 12;
+      const imgX2 = cxc - imgSize / 2;
+      pdf.setFillColor('#F0F4FF');
+      pdfRr(imgX2, imgY2, imgSize, imgSize, 6);
+
+      if (b.imagemurl) {
+        try {
+          const imgResp = await fetch(b.imagemurl);
+          if (imgResp.ok) {
+            const imgBuf = await imgResp.arrayBuffer();
+            const imgB64 = Buffer.from(imgBuf).toString('base64');
+            const ext = path.extname(b.imagemurl).toLowerCase();
+            const fmt = (ext === '.png' || ext === '.gif') ? 'PNG' : 'JPEG';
+            const iP = 4;
+            pdf.addImage(imgB64, fmt, imgX2 + iP, imgY2 + iP, imgSize - iP * 2, imgSize - iP * 2);
+          }
+        } catch (_) {}
+      }
+
+      // ── Nome do badge ──
+      const nameY2 = imgY2 + imgSize + 14;
+      pdf.setTextColor('#1E3A5F');
+      pdf.setFont('Helvetica', 'bold');
+      pdf.setFontSize(18);
+      pdf.text(b.nome || '', cxc, nameY2, { align: 'center', baseline: 'alphabetic' });
+
+      // ── Descrição ──
+      pdf.setTextColor('#555555');
+      pdf.setFont('Helvetica', 'normal');
+      pdf.setFontSize(11);
+      pdf.text((b.descricao || '').slice(0, 100), cxc, nameY2 + 8, { align: 'center', baseline: 'alphabetic' });
+
+      // ── Tags (área / nível / pontos) ──
+      const tagDefs2 = [];
+      if (b.area_nome)  tagDefs2.push({ text: b.area_nome,          bg: '#EFF6FF', color: '#2563EB' });
+      if (b.nivel_nome) tagDefs2.push({ text: b.nivel_nome,         bg: '#FFF7ED', color: '#EA580C' });
+      if (b.pontos)     tagDefs2.push({ text: `${b.pontos} pts`,    bg: '#F0FDF4', color: '#16A34A' });
+
+      if (tagDefs2.length > 0) {
+        pdf.setFont('Helvetica', 'bold');
+        pdf.setFontSize(10);
+        const tagH = 7, tagPx = 4, tagGap = 3;
+        const twArr = tagDefs2.map(t => pdf.getTextWidth(t.text) + tagPx * 2);
+        const totalTW = twArr.reduce((a, b) => a + b, 0) + tagGap * (tagDefs2.length - 1);
+        let tx2 = cxc - totalTW / 2;
+        const tagY2 = nameY2 + 16;
+        for (let i = 0; i < tagDefs2.length; i++) {
+          pdf.setFillColor(tagDefs2[i].bg);
+          pdfRr(tx2, tagY2, twArr[i], tagH, tagH / 2);
+          pdf.setTextColor(tagDefs2[i].color);
+          pdf.text(tagDefs2[i].text, tx2 + twArr[i] / 2, tagY2 + tagH * 0.72, { align: 'center', baseline: 'alphabetic' });
+          tx2 += twArr[i] + tagGap;
+        }
+      }
+
+      // ── Divisor ──
+      const divY = nameY2 + 34;
+      pdf.setDrawColor('#E5E7EB');
+      pdf.setLineWidth(0.3);
+      pdf.line(cardX + 20, divY, cardX + cardW - 20, divY);
+
+      // ── Footer ──
+      pdf.setTextColor('#9CA3AF');
+      pdf.setFont('Helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.text('Softinsa Talent Management', cxc, divY + 8, { align: 'center', baseline: 'alphabetic' });
+
+      // Base64 do PDF
+      pdfBase64 = Buffer.from(pdf.output('arraybuffer')).toString('base64');
+
+      // Guardar PDF na BD para reutilização
+      try {
+        await pool.query(
+          'UPDATE candidaturasbadge SET certificado_pdf_base64 = $1 WHERE idcandidatura = $2',
+          [pdfBase64, candCheck.rows[0].idcandidatura]
+        );
+      } catch (e) {
+        console.warn('Não foi possível guardar PDF na BD:', e.message);
+      }
+    } catch (e) {
+      console.warn('Erro ao gerar PDF:', e.message);
+    }
+
+    return res.json({ base64: base64str, certificado_pdf_base64: pdfBase64 });
   } catch (err) {
     console.error('Erro ao gerar imagem do badge:', err.message);
     res.status(500).json({ error: err.message });
