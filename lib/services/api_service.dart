@@ -686,30 +686,48 @@ class ApiService {
     return _decodeJsonSafely(response);
   }
 
+  static String _mimeType(String filePath) {
+    final ext = filePath.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'pdf': return 'application/pdf';
+      case 'png': return 'image/png';
+      case 'gif': return 'image/gif';
+      case 'jpg':
+      case 'jpeg':
+      default: return 'image/jpeg';
+    }
+  }
+
   static Future<Map<String, dynamic>> submitCandidatura(
     int badgeId,
     Map<int, String> filesMap,
   ) async {
     final uri = Uri.parse('$baseUrl/candidaturas');
-    final request = http.MultipartRequest('POST', uri);
 
-    request.fields['user_id'] = Session.id.toString();
-    request.fields['badge_id'] = badgeId.toString();
-
+    final evidencias = <Map<String, dynamic>>[];
     for (final entry in filesMap.entries) {
       final requisitoId = entry.key;
       final filePath = entry.value;
-      final file = await http.MultipartFile.fromPath(
-        'file_$requisitoId',
-        filePath,
-      );
-      request.files.add(file);
-      request.fields['requisito_id_$requisitoId'] = requisitoId.toString();
+      final bytes = await File(filePath).readAsBytes();
+      final mime = _mimeType(filePath);
+      final base64Data = 'data:$mime;base64,${base64Encode(bytes)}';
+      evidencias.add({
+        'requisito_id': requisitoId,
+        'base64': base64Data,
+        'nome': filePath.split('/').last.split('\\').last,
+      });
     }
 
     try {
-      final streamedResponse = await request.send().timeout(_timeout);
-      final response = await http.Response.fromStream(streamedResponse);
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'user_id': Session.id,
+          'badge_id': badgeId,
+          'evidencias': evidencias,
+        }),
+      ).timeout(_timeout);
 
       if (response.statusCode != 201 && response.statusCode != 200) {
         throw Exception(

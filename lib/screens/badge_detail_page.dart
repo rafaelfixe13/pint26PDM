@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'dart:convert';
 import '../services/api_service.dart';
@@ -1224,6 +1225,20 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
               final image = await picker.pickImage(source: ImageSource.camera);
               if (image != null) {
                 setState(() { selectedFiles[requisitoId] = image.path; });
+              }
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.picture_as_pdf),
+            title: Text('Selecionar PDF'),
+            onTap: () async {
+              Navigator.pop(context);
+              final file = await FilePicker.pickFile(
+                type: FileType.custom,
+                allowedExtensions: ['pdf'],
+              );
+              if (file != null && file.path != null) {
+                setState(() { selectedFiles[requisitoId] = file.path!; });
               }
             },
           ),
