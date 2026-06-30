@@ -89,10 +89,24 @@ class _CertificatosPageState extends State<CertificatosPage> {
           }
 
           final certificados = snapshot.data ?? [];
+          
+          // Filtrar apenas badges com certificado (genérico ou gerado)
+          final comCertificado = certificados
+              .where((badge) =>
+                  (badge['certificado'] != null && badge['certificado'].toString().isNotEmpty) ||
+                  (badge['certificado_pdf_base64'] != null && badge['certificado_pdf_base64'].toString().isNotEmpty))
+              .toList();
 
-          if (certificados.isEmpty) {
-            return const Center(
-              child: Text('Nenhum certificado disponível.'),
+          if (comCertificado.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.description_outlined, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('Sem certificados disponíveis'),
+                ],
+              ),
             );
           }
 
@@ -100,9 +114,11 @@ class _CertificatosPageState extends State<CertificatosPage> {
             padding: const EdgeInsets.all(16),
             itemCount: certificados.length,
             itemBuilder: (context, index) {
-              final cert = certificados[index];
-              final titulo = cert['titulo'] ?? cert['nomebadge'] ?? 'Certificado';
-              final pdfBase64 = cert['pdf_base64']?.toString() ?? '';
+              final badge = comCertificado[index];
+              final cert = (badge['certificado_pdf_base64']?.toString()?.isNotEmpty == true
+                  ? badge['certificado_pdf_base64']
+                  : badge['certificado']?.toString()) ?? '';
+              
               return Card(
                 child: ListTile(
                   title: Text(titulo),

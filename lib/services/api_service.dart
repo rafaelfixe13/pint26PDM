@@ -3,7 +3,41 @@ import 'package:http/http.dart' as http;
 import '../services/session.dart';
 
 class ApiService {
-  static const String baseUrl = "http://10.0.2.2:3000";
+  //static const String baseUrl = "https://pint26pdm-api.onrender.com";
+  static const String baseUrl = "http://192.168.1.225:3000";
+  static const _timeout = Duration(seconds: 10);
+
+  static Future<http.Response> _get(Uri uri, {Map<String, String>? headers}) async {
+    try {
+      return await http.get(uri, headers: headers).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Sem ligação ao servidor. Verifica a tua ligação à VPN/WiFi.');
+    }
+  }
+
+  static Future<http.Response> _post(Uri uri, {Map<String, String>? headers, Object? body}) async {
+    try {
+      return await http.post(uri, headers: headers, body: body).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Sem ligação ao servidor. Verifica a tua ligação à VPN/WiFi.');
+    }
+  }
+
+  static Future<http.Response> _patch(Uri uri, {Map<String, String>? headers, Object? body}) async {
+    try {
+      return await http.patch(uri, headers: headers, body: body).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Sem ligação ao servidor. Verifica a tua ligação à VPN/WiFi.');
+    }
+  }
+
+  static Future<http.Response> _delete(Uri uri, {Map<String, String>? headers}) async {
+    try {
+      return await http.delete(uri, headers: headers).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Sem ligação ao servidor. Verifica a tua ligação à VPN/WiFi.');
+    }
+  }
 
   static bool _isJson(String body) {
     final text = body.trim();
@@ -512,23 +546,35 @@ class ApiService {
       );
     }
 
-    return _decodeJsonSafely(response);
+      return _decodeJsonSafely(response);
+    } on TimeoutException {
+      throw Exception('Sem ligação ao servidor. Verifica a tua ligação à VPN/WiFi.');
+    }
   }
 
-  static Future<List<dynamic>> getCandidaturaRequisitos(int candidaturaId) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/candidaturas/$candidaturaId/requisitos'),
-      headers: {'Accept': 'application/json'},
+  /// Gera (ou obtém em cache) a imagem PNG e o certificado PDF para um badge.
+  /// Devolve { base64, certificado_pdf_base64 }.
+  static Future<Map<String, dynamic>> gerarCertificado(int badgeId) async {
+    final userId = Session.id;
+    if (userId == 0) {
+      throw Exception('Sessão inválida. Faz login novamente.');
+    }
+
+    final response = await _post(
+      Uri.parse('$baseUrl/badges/$badgeId/generate-image'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({'user_id': userId}),
     );
 
     if (response.statusCode == 200) {
-      return _decodeJsonSafely(response) as List;
+      return _decodeJsonSafely(response) as Map<String, dynamic>;
     }
 
     throw Exception(
-      _extractErrorMessage(
-        response,
-        fallback: 'Erro ao carregar requisitos da candidatura',
-      ),
+      _extractErrorMessage(response, fallback: 'Erro ao gerar certificado'),
     );
-  }}
+  }
+}

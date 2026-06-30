@@ -6,7 +6,48 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { createCanvas, loadImage } = require('canvas');
+const PDFDocument = require('pdfkit');
+require('dotenv').config();
+const sgMail = require('@sendgrid/mail');
+const { initializeApp: initializeFirebaseApp, cert } = require('firebase-admin/app');
+const { getMessaging } = require('firebase-admin/messaging');
 
+// ─────────────────────────────────────────────────────────
+// EMAIL (SendGrid via API HTTPS — SMTP de saída é bloqueado em muitos PaaS,
+// incluindo o Render, daí usar uma API em vez de ligação SMTP direta)
+// ─────────────────────────────────────────────────────────
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+} else {
+  console.warn('SENDGRID_API_KEY não definida. Sets em .env para enviar emails.');
+}
+
+async function enviarEmail({ to, subject, html, text }) {
+  if (!to || !process.env.SENDGRID_API_KEY) return;
+  try {
+    await sgMail.send({
+      to,
+      from: process.env.EMAIL_FROM || 'no-reply@example.com',
+      subject,
+      text: text || html?.replace(/<[^>]+>/g, ''),
+      html,
+    });
+  } catch (err) {
+    console.error('Erro ao enviar email:', err.response?.body?.errors || err.message);
+  }
+}
+
+async function sendCandidaturaConfirmation(email, nome, badgeNome, idCandidatura) {
+  if (!email) return;
+
+  await enviarEmail({
+    to: email,
+    subject: `Confirmação de submissão da candidatura #${idCandidatura}`,
+    html: `<p>Olá ${nome || ''},</p><p>Recebemos a sua candidatura para o badge "<strong>${badgeNome}</strong>".</p><p><strong>ID da candidatura:</strong> ${idCandidatura}</p><p>Obrigado,<br/>Equipa PINT</p>`,
+  });
+  console.log('Email de confirmação enviado para', email);
+}
+      
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -60,6 +101,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+app.use(express.static("public"));
 app.use("/uploads", express.static("uploads"));
 
 // ─────────────────────────────────────────────────────────
@@ -510,40 +552,39 @@ app.get("/utilizadores/:id/candidaturas", async (req, res) => {
     }
     const badgesExist = await tableExists('public.badges');
 
-    if (badgesExist) {
-      const result = await pool.query(`
-        SELECT
-          cb.idcandidatura,
-          cb.user_id,
-          cb.badge_id,
-          cb.estado,
-          cb.datasubmissao,
-          cb.comentariogeral,
-          cb.datacriacao,
-          cb.progresso_atual,
-          cb.progresso_total,
-          CASE
-            WHEN cb.progresso_total > 0
-             AND cb.progresso_atual >= cb.progresso_total
-              THEN 'Submetido'
-            ELSE CONCAT(cb.progresso_atual, '/', cb.progresso_total)
-          END AS estado_visual,
-            b.idbadge,
-            b.nome,
-            b.descricao,
-            b.imagemurl,
-            b.idnivel,
-            n.nome AS nivel,
-            b.pontos,
-          b.linkpublicobase,
-          b.competencias,
-          b.certificado
-        FROM candidaturasbadge cb
-        INNER JOIN badges b ON b.idbadge = cb.badge_id
-        LEFT JOIN nivel n ON n.idnivel = b.idnivel
-        WHERE cb.user_id = $1
-        ORDER BY cb.datacriacao DESC
-      `, [idUtilizador]);
+    const result = await pool.query(`
+      SELECT
+        cb.idcandidatura,
+        cb.user_id,
+        cb.badge_id,
+        cb.estado,
+        cb.datasubmissao,
+        cb.comentariogeral,
+        cb.datacriacao,
+        cb.progresso_atual,
+        cb.progresso_total,
+        CASE
+          WHEN cb.progresso_total > 0
+           AND cb.progresso_atual >= cb.progresso_total
+            THEN 'Submetido'
+          ELSE CONCAT(cb.progresso_atual, '/', cb.progresso_total)
+        END AS estado_visual,
+        b.idbadge,
+        b.nome,
+        b.descricao,
+        b.imagemurl,
+        b.idnivel,
+        b.pontos,
+        b.linkpublicobase,
+        b.competencias,
+        b.certificado,
+        cb.certificado_pdf_base64,
+        b.expiremeses
+      FROM candidaturasbadge cb
+      INNER JOIN badges b ON b.idbadge = cb.badge_id
+      WHERE cb.user_id = $1
+      ORDER BY cb.datacriacao DESC
+    `, [idUtilizador]);
 
       res.json(result.rows);
     } else {
@@ -843,7 +884,7 @@ app.get("/utilizadores/:id/badges", async (req, res) => {
       `
       SELECT 
         b.*,
-        n.nome AS nivel,
+        cb.certificado_pdf_base64,
         COALESCE(cb.progresso_atual, 0) as progresso_atual,
         COALESCE(cb.progresso_total, requisitos_count.total) as progresso_total,
         FALSE as conquistado,
@@ -1235,8 +1276,20 @@ app.post('/badges/:id/generate-image', async (req, res) => {
     if (badgeRes.rows.length === 0) return res.status(404).json({ error: 'badge not found' });
     if (userRes.rows.length === 0) return res.status(404).json({ error: 'user not found' });
 
-    const badge = badgeRes.rows[0];
-    const user = userRes.rows[0];
+    const b = badgeRes.rows[0];
+
+    // ── Verificar se já existe imagem e PDF guardados ──
+    const existingData = await pool.query(
+      'SELECT badge_image_base64, certificado_pdf_base64 FROM candidaturasbadge WHERE idcandidatura = $1',
+      [candCheck.rows[0].idcandidatura]
+    );
+    const existingRow = existingData.rows[0];
+    if (existingRow?.badge_image_base64 && existingRow?.certificado_pdf_base64) {
+      return res.json({
+        base64: existingRow.badge_image_base64,
+        certificado_pdf_base64: existingRow.certificado_pdf_base64
+      });
+    }
 
     // Canvas size (LinkedIn recommended social card ~1200x630)
     const width = 1200;
@@ -1313,21 +1366,243 @@ app.post('/badges/:id/generate-image', async (req, res) => {
 
     const buffer = canvas.toBuffer('image/png');
 
-    // convert to base64 and store in candidaturasbadge (only base64)
+    // ── GERAR PDF DO CERTIFICADO a partir da mesma imagem ──
+    let pdfBase64 = null;
     try {
-      const base64str = buffer.toString('base64');
-      const idCandidatura = candCheck.rows[0].idcandidatura;
-      await pool.query(
-        'UPDATE candidaturasbadge SET badge_image_base64 = $1 WHERE idcandidatura = $2',
-        [base64str, idCandidatura]
+      const userRes = await pool.query(
+        'SELECT nome FROM utilizadores WHERE idutilizador = $1',
+        [userId]
       );
+      const userName = userRes.rows[0]?.nome || 'Utilizador';
 
-      // respond with base64 for convenience
-      return res.json({ base64: base64str });
-    } catch (err) {
-      console.error('Erro ao salvar imagem do badge na candidaturasbadge:', err.message || err);
-      // respond with base64 even if DB save fails
-      return res.json({ base64: buffer.toString('base64') });
+      // Carregar imagem do badge antes de criar o PDF (evita async dentro do Promise do PDFKit)
+      let badgeImg = null;
+      try {
+        if (b.imagemurl) {
+          badgeImg = await loadImage(b.imagemurl);
+        }
+      } catch (_) {}
+
+      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0 });
+      const chunks = [];
+      doc.on('data', chunk => chunks.push(chunk));
+
+      await new Promise((resolve, reject) => {
+        doc.on('end', resolve);
+        doc.on('error', reject);
+
+        // Fundo branco
+        doc.rect(0, 0, doc.page.width, doc.page.height).fill('#ffffff');
+
+        // Borda decorativa azul escura
+        doc.rect(20, 20, doc.page.width - 40, doc.page.height - 40)
+           .lineWidth(4).stroke('#1E3A5F');
+
+        // Linha decorativa adicional
+        doc.rect(30, 30, doc.page.width - 60, doc.page.height - 60)
+           .lineWidth(1).stroke('#38BDF8');
+
+        // Logo SOFTINSA
+        doc.font('Helvetica-Bold').fontSize(36).fillColor('#1E3A5F');
+        doc.text('S', 60, 60, { continued: true });
+        doc.fillColor('#1E3A5F').text('O', 72, 60, { continued: true });
+        doc.fillColor('#1E3A5F').text('F', 87, 60, { continued: true });
+        doc.fillColor('#38BDF8').text('T', 108, 60, { continued: true });
+        doc.fillColor('#1E3A5F').text('I', 123, 60, { continued: true });
+        doc.fillColor('#1E3A5F').text('N', 135, 60, { continued: true });
+        doc.fillColor('#1E3A5F').text('S', 153, 60, { continued: true });
+        doc.fillColor('#1E3A5F').text('A', 171, 60, { continued: true });
+
+        // Título do certificado
+        doc.fontSize(28).fillColor('#1E3A5F');
+        doc.text('CERTIFICADO DE COMPETÊNCIA', 60, 120, { align: 'center', width: doc.page.width - 120 });
+
+        // Subtítulo
+        doc.fontSize(16).fillColor('#555555');
+        doc.text('Este certificado é atribuído a:', 60, 175, { align: 'center', width: doc.page.width - 120 });
+
+        // Nome do utilizador
+        doc.font('Helvetica-Bold').fontSize(32).fillColor('#1E3A5F');
+        doc.text(userName, 60, 210, { align: 'center', width: doc.page.width - 120 });
+
+        // Texto explicativo
+        doc.font('Helvetica').fontSize(14).fillColor('#444444');
+        doc.text(
+          `Pela conclusão com sucesso do badge "${b.nome}" no âmbito do programa Softinsa Talent Management.`,
+          80, 270,
+          { align: 'center', width: doc.page.width - 160, lineGap: 8 }
+        );
+
+        // Detalhes do badge
+        const detailsY = 340;
+        doc.fontSize(12).fillColor('#666666');
+        if (b.area_nome) {
+          doc.text(`Área: ${b.area_nome}`, 80, detailsY, { width: doc.page.width - 160 });
+        }
+        if (b.nivel_nome) {
+          doc.text(`Nível: ${b.nivel_nome}`, 80, detailsY + 22, { width: doc.page.width - 160 });
+        }
+        if (b.pontos) {
+          doc.text(`Pontos: ${b.pontos}`, 80, detailsY + 44, { width: doc.page.width - 160 });
+        }
+
+        // Imagem do badge no canto inferior direito
+        if (badgeImg) {
+          doc.image(badgeImg, doc.page.width - 160, doc.page.height - 160, {
+            width: 100, height: 100
+          });
+        }
+
+        // Data de emissão
+        const today = new Date();
+        const dataStr = today.toLocaleDateString('pt-PT', {
+          day: 'numeric', month: 'long', year: 'numeric'
+        });
+        doc.fontSize(11).fillColor('#888888');
+        doc.text(`Emissão: ${dataStr}`, 60, doc.page.height - 80, { width: doc.page.width - 120, align: 'center' });
+
+        // Footer
+        doc.fontSize(10).fillColor('#AAAAAA');
+        doc.text('Softinsa Talent Management', 60, doc.page.height - 55, { width: doc.page.width - 120, align: 'center' });
+
+        doc.end();
+      });
+
+      const pdfBuffer = Buffer.concat(chunks);
+      pdfBase64 = pdfBuffer.toString('base64');
+    } catch (pdfErr) {
+      console.warn('Erro ao gerar PDF do certificado:', pdfErr.message);
+    }
+
+    // Guardar imagem e PDF na BD
+    try {
+      await pool.query('ALTER TABLE candidaturasbadge ADD COLUMN IF NOT EXISTS badge_image_base64 TEXT');
+      await pool.query('ALTER TABLE candidaturasbadge ADD COLUMN IF NOT EXISTS certificado_pdf_base64 TEXT');
+      await pool.query(
+        `UPDATE candidaturasbadge SET badge_image_base64 = $1, certificado_pdf_base64 = COALESCE($2, certificado_pdf_base64) WHERE idcandidatura = $3`,
+        [base64str, pdfBase64, candCheck.rows[0].idcandidatura]
+      );
+    } catch (e) {
+      console.warn('Não foi possível guardar na BD:', e.message);
+    }
+
+    return res.json({
+      base64: base64str,
+      certificado_pdf_base64: pdfBase64
+    });
+  } catch (err) {
+    console.error('Erro ao gerar imagem do badge:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────
+// DASHBOARD — Learning Path Progress
+// GET /utilizadores/:id/dashboard
+// ─────────────────────────────────────────────────────────
+app.get('/utilizadores/:id/dashboard', async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (isNaN(userId)) return res.status(400).json({ error: 'ID inválido' });
+
+  try {
+    const lpRes = await pool.query(
+      `SELECT nome FROM learningpaths WHERE ativo = TRUE ORDER BY idlearningpath ASC LIMIT 1`
+    );
+    const learningPathNome = lpRes.rows[0]?.nome ?? 'Jornada Técnica';
+
+    // Contagem global: total de badges ativos e aprovados pelo utilizador
+    const countRes = await pool.query(`
+      SELECT
+        COUNT(b.idbadge)::int                                  AS total,
+        COUNT(b.idbadge) FILTER (WHERE cb.estado = 'APPROVED')::int AS aprovados
+      FROM badges b
+      LEFT JOIN candidaturasbadge cb
+             ON cb.badge_id = b.idbadge AND cb.user_id = $1
+      WHERE b.ativo = TRUE
+    `, [userId]);
+    const totalBadges   = countRes.rows[0]?.total    ?? 0;
+    const badgesAprovados = countRes.rows[0]?.aprovados ?? 0;
+
+    // CTE em dois passos para evitar o problema DISTINCT + ROW_NUMBER():
+    // 1) distinct_niveis: pares (area, nivel) únicos
+    // 2) nivel_rank: aplica ROW_NUMBER() sobre esses pares únicos → 1=A, 2=B...
+    const { rows } = await pool.query(`
+      WITH distinct_niveis AS (
+        SELECT DISTINCT a.idarea, n.idnivel
+        FROM areas  a
+        INNER JOIN badges b ON b.idarea  = a.idarea   AND b.ativo = TRUE
+        INNER JOIN nivel  n ON n.idnivel = b.idnivel
+        WHERE a.ativo = TRUE
+      ),
+      nivel_rank AS (
+        SELECT
+          sl.idserviceline,
+          sl.nome                                              AS serviceline_nome,
+          a.idarea,
+          a.nome                                               AS area_nome,
+          dn.idnivel,
+          n.nome                                               AS nivel_nome,
+          ROW_NUMBER() OVER (
+            PARTITION BY a.idarea ORDER BY dn.idnivel ASC
+          )                                                    AS pos
+        FROM distinct_niveis dn
+        INNER JOIN areas       a  ON a.idarea       = dn.idarea
+        INNER JOIN serviceline sl ON sl.idserviceline = a.idserviceline AND sl.ativo = TRUE
+        INNER JOIN nivel       n  ON n.idnivel       = dn.idnivel
+      )
+      SELECT
+        nr.idserviceline,
+        nr.serviceline_nome,
+        nr.idarea,
+        nr.area_nome,
+        CHR(64 + nr.pos::int)                                  AS nivel_grupo,
+        nr.nivel_nome,
+        COUNT(DISTINCT b.idbadge)::int                         AS total_badges,
+        COUNT(DISTINCT b.idbadge) FILTER (
+          WHERE cb.estado = 'APPROVED'
+        )::int                                                 AS badges_aprovados,
+        CASE
+          WHEN COUNT(b.idbadge) FILTER (WHERE cb.estado = 'APPROVED') > 0
+            THEN 'APPROVED'
+          WHEN COUNT(b.idbadge) FILTER (
+            WHERE cb.estado IN ('SUBMITTED','UNDER_REVIEW')
+          ) > 0 THEN 'SUBMITTED'
+          WHEN COUNT(b.idbadge) FILTER (WHERE cb.estado = 'OPEN') > 0
+            THEN 'OPEN'
+          ELSE 'NAO_INICIADO'
+        END                                                    AS estado
+      FROM nivel_rank nr
+      INNER JOIN badges b ON b.idarea = nr.idarea AND b.idnivel = nr.idnivel AND b.ativo = TRUE
+      LEFT  JOIN candidaturasbadge cb
+             ON cb.badge_id = b.idbadge AND cb.user_id = $1
+      WHERE nr.pos <= 5
+      GROUP BY nr.idserviceline, nr.serviceline_nome, nr.idarea, nr.area_nome,
+               nr.idnivel, nr.nivel_nome, nr.pos
+      ORDER BY nr.idserviceline ASC, nr.idarea ASC, nr.pos ASC
+    `, [userId]);
+
+    const slMap = new Map();
+
+    for (const row of rows) {
+
+      if (!slMap.has(row.idserviceline)) {
+        slMap.set(row.idserviceline, {
+          idserviceline: row.idserviceline,
+          nome: row.serviceline_nome,
+          areas: new Map()
+        });
+      }
+      const sl = slMap.get(row.idserviceline);
+
+      if (!sl.areas.has(row.idarea)) {
+        sl.areas.set(row.idarea, { idarea: row.idarea, nome: row.area_nome, niveis: [] });
+      }
+      sl.areas.get(row.idarea).niveis.push({
+        nivel_grupo:      row.nivel_grupo,      // "A", "B", "C", "D", "E"
+        total_badges:     parseInt(row.total_badges),
+        badges_aprovados: parseInt(row.badges_aprovados),
+        estado:           row.estado,
+      });
     }
   } catch (err) {
     console.error('Erro ao gerar imagem do badge:', err.message || err);

@@ -443,142 +443,344 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
     );
   }
 
-  Widget _icon(IconData icon, Color color, {bool selected = false}) {
-    return Container(
-      width: 52, height: 52,
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFFEFF6FF) : Color.fromARGB((0.15 * 255).round(), (color.r * 255).round(), (color.g * 255).round(), (color.b * 255).round()),
-        borderRadius: BorderRadius.circular(12),
-        border: selected ? Border.all(color: const Color(0xFF2563EB), width: 2) : null,
+  Future<void> _mostrarPdfDialog(BuildContext context, String pdfBase64, String titulo) async {
+    final extracted = extractBase64Pdf(pdfBase64);
+    if (extracted == null) {
+      _mostrarImagemDialog(context, pdfBase64, titulo);
+      return;
+    }
+    try {
+      Base64PdfWidget.decodeBase64(extracted);
+    } catch (e) {
+      _mostrarImagemDialog(context, pdfBase64, titulo);
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          padding: EdgeInsets.all(20),
+          constraints:
+              BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(titulo,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2563EB))),
+                  GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.close, color: Colors.grey)),
+                ],
+              ),
+              SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Base64PdfWidget(pdfData: extracted, fileName: '$titulo.pdf'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Icon(icon, size: 26, color: selected ? const Color(0xFF2563EB) : color),
+    );
+  }
+
+  Future<void> _mostrarImagemDialog(
+      BuildContext context, String urlFicheiro, String titulo) async {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(titulo,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2563EB))),
+                  GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.close, color: Colors.grey)),
+                ],
+              ),
+              SizedBox(height: 16),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Color(0xFF2563EB), width: 1),
+                ),
+                child: urlFicheiro.isNotEmpty
+                    ? SelectableText(
+                        urlFicheiro,
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFF2563EB), fontFamily: 'monospace'),
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.image, size: 72, color: Colors.grey),
+                          SizedBox(height: 8),
+                          Text('Imagem não disponível',
+                              style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+              ),
+              SizedBox(height: 16),
+              Text('📌 Link do ficheiro (PDF, imagem, etc)',
+                  style: TextStyle(
+                      fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w500)),
+              SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: urlFicheiro.isNotEmpty
+                          ? () {
+                              Clipboard.setData(ClipboardData(text: urlFicheiro));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text('Link copiado!'),
+                                    duration: Duration(seconds: 2)),
+                              );
+                            }
+                          : null,
+                      icon: Icon(Icons.copy, size: 18),
+                      label: Text('Copiar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            urlFicheiro.isNotEmpty ? Color(0xFF2563EB) : Colors.grey,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text('Como abrir?'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('1. Copie o link acima',
+                                    style: TextStyle(fontSize: 13)),
+                                SizedBox(height: 8),
+                                Text('2. Abra um navegador web',
+                                    style: TextStyle(fontSize: 13)),
+                                SizedBox(height: 8),
+                                Text('3. Cole o link na barra de endereço',
+                                    style: TextStyle(fontSize: 13)),
+                                SizedBox(height: 12),
+                                Container(
+                                  padding: EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '⚠️ Certifique-se de que o link é direto ao ficheiro (PDF, JPG, etc)',
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.orange.shade900),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text('Entendi'))
+                            ],
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.help_outline, size: 18),
+                      label: Text('Como?'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Color(0xFF2563EB),
+                        side: BorderSide(color: Color(0xFF2563EB)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Obtém o PDF base64 do certificado, gerando-o via API se necessário.
+  /// Verifica primeiro no badge/candidatura, depois tenta gerar.
+  Future<String?> _obterCertificadoPdfBase64() async {
+    final badge = _badge ?? widget.badge;
+
+    // 1. Tentar certificado_pdf_base64 da candidatura (personalizado)
+    if (badge?['certificado_pdf_base64'] != null &&
+        (badge['certificado_pdf_base64'] as String).isNotEmpty) {
+      return badge['certificado_pdf_base64'] as String;
+    }
+
+    // 2. Tentar certificado genérico do badge
+    if (badge?['certificado'] != null && (badge['certificado'] as String).isNotEmpty) {
+      final cert = badge['certificado'] as String;
+      final extracted = extractBase64Pdf(cert);
+      if (extracted != null) return extracted;
+    }
+
+    // 3. Tentar gerar via API
+    try {
+      final badgeId = badge?['idbadge'] ?? badge?['badge_id'];
+      if (badgeId != null) {
+        final result = await ApiService.gerarCertificado(badgeId as int);
+        final pdfBase64 = result['certificado_pdf_base64'] as String?;
+        if (pdfBase64 != null && pdfBase64.isNotEmpty) {
+          // Atualizar no badge local para não chamar outra vez
+          badge?['certificado_pdf_base64'] = pdfBase64;
+          return pdfBase64;
+        }
+      }
+    } catch (e) {
+      debugPrint('Erro ao gerar certificado: $e');
+    }
+
+    return null;
+  }
+
+  Future<void> _guardarCertificado() async {
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
       );
     }
 
-    Future<void> _compartilharPDF() async {
     try {
-      // Check if badge has certificate in Base64
-      final certificadoBase64 = widget.badge['certificado'];
-      if (certificadoBase64 == null || certificadoBase64.isEmpty) {
-        throw Exception('Certificado não disponível');
+      final pdfBase64 = await _obterCertificadoPdfBase64();
+      if (pdfBase64 == null) {
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Certificado não disponível')),
+          );
+        }
+        return;
       }
 
-      // Show loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('A preparar certificado...')),
-      );
+      final pdfBytes = base64Decode(pdfBase64);
+      final badge = _badge ?? widget.badge;
+      final badgeName = (badge['nome'] ?? 'Certificado') as String;
+      final safeFileName =
+          badgeName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_').trim();
+      final fileName = '$safeFileName.pdf';
 
-      // Decode Base64 to bytes
-      final pdfBytes = base64.decode(certificadoBase64);
+      // Android: tentar guardar diretamente na pasta Downloads visível
+      if (Platform.isAndroid) {
+        try {
+          var status = await Permission.manageExternalStorage.status;
+          if (!status.isGranted) {
+            status = await Permission.manageExternalStorage.request();
+          }
 
-      // Save to temporary file
+          final downloadsDir = Directory('/storage/emulated/0/Download');
+          if (status.isGranted && await downloadsDir.exists()) {
+            final file = File('${downloadsDir.path}/$fileName');
+            await file.writeAsBytes(pdfBytes);
+            if (mounted) {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Guardado em Downloads: $fileName'),
+                  duration: const Duration(seconds: 5),
+                  action: SnackBarAction(
+                    label: 'Abrir',
+                    onPressed: () => OpenFile.open(file.path),
+                  ),
+                ),
+              );
+            }
+            return;
+          }
+        } catch (_) {
+          // pasta não acessível, usar partilha como fallback
+        }
+      }
+
+      // iOS ou fallback Android: guardar temporariamente e abrir partilha nativa
       final tempDir = await getTemporaryDirectory();
-      final fileName = '${widget.badge['nome']?.replaceAll(' ', '_') ?? 'certificado'}_${DateTime.now().millisecondsSinceEpoch}.pdf';
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(pdfBytes);
 
-      // Share via Share Sheet
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'Certificado: ${widget.badge['nome']}',
-        text: 'Conquistei o certificado "${widget.badge['nome']}"! 🎖️',
-      );
+      if (mounted) Navigator.pop(context);
 
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'application/pdf')],
+          subject: 'Certificado: $badgeName',
+        ),
+      );
     } catch (e) {
       if (mounted) {
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.red,
-          ),
+              content: Text('Erro ao guardar certificado: $e'),
+              backgroundColor: Colors.red),
         );
       }
     }
   }
-}
 
-class _CandidaturaDialog extends StatefulWidget {
-  final dynamic badge;
-  final List<dynamic> requisitos;
-  final int? candidaturaId;
-  final VoidCallback onClose;
-
-  const _CandidaturaDialog({
-    required this.badge,
-    required this.requisitos,
-    this.candidaturaId,
-    required this.onClose,
-  });
-
-  @override
-  State<_CandidaturaDialog> createState() => _CandidaturaDialogState();
-}
-
-class _CandidaturaDialogState extends State<_CandidaturaDialog> {
-  late Map<int, String> selectedFiles;
-  late Map<int, dynamic> submittedRequisitos;
-  bool isSubmitting = false;
-  bool isLoadingSubmitted = true;
-
-  @override
-  void initState() {
-    super.initState();
-    selectedFiles = {};
-    submittedRequisitos = {};
-    if (widget.candidaturaId != null) {
-      _loadSubmittedRequisitos();
-    } else {
-      isLoadingSubmitted = false;
-    }
+  void _copiarLinkBadge() {
+    final badgeId = _badge?['idbadge'] ?? widget.badgeId;
+    if (badgeId == null) return;
+    final url = '${ApiService.baseUrl}/badge/$badgeId';
+    Clipboard.setData(ClipboardData(text: url));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Link copiado: $url'),
+        backgroundColor: Color(0xFF2563EB),
+        duration: Duration(seconds: 3),
+      ),
+    );
   }
 
-  Future<void> _loadSubmittedRequisitos() async {
-    try {
-      final submitted =
-          await ApiService.getCandidaturaRequisitos(widget.candidaturaId!);
-      if (!mounted) return;
-      setState(() {
-        for (var req in submitted) {
-          submittedRequisitos[req['idrequisito']] = req;
-        }
-        isLoadingSubmitted = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        isLoadingSubmitted = false;
-      });
-    }
-  }
+  Future<void> _definirLembrete() async {
+    final badge = _badge ?? widget.badge;
+    final badgeId = badge?['idbadge'] as int?;
+    final badgeNome = badge?['nome'] as String?;
 
-  Future<void> _viewFile(String fileUrl) async {
-    if (fileUrl.isEmpty) return;
+    final tituloCtrl = TextEditingController(
+        text: badgeNome != null ? 'Completar badge: $badgeNome' : '');
+    final descCtrl = TextEditingController();
+    DateTime? prazo;
 
-    final extension = fileUrl.split('.').last.toLowerCase();
-    final isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension);
-    final isPdf = extension == 'pdf';
-
-    // Treat data URIs / base64 as images as well
-    if (isImage || Base64ImageWidget.isBase64(fileUrl)) {
-      _showImageViewer(fileUrl);
-    } else if (isPdf) {
-      _downloadAndOpenPdf(fileUrl);
-    } else {
-      // For other file types, try to open with device app
-      try {
-        await launchUrl(Uri.parse(fileUrl));
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Não foi possível abrir o ficheiro')),
-          );
-        }
-      }
-    }
-  }
-
-  void _showImageViewer(String imageUrl) {
-    showDialog(
+    await showDialog(
       context: context,
       builder: (context) => Dialog(
         child: Column(
@@ -670,29 +872,82 @@ class _CandidaturaDialogState extends State<_CandidaturaDialog> {
 
       final response = await http.get(Uri.parse(pdfUrl));
 
-      if (response.statusCode == 200) {
-        final tempDir = await getTemporaryDirectory();
-        final fileName = pdfUrl.split('/').last;
-        final file = File('${tempDir.path}/$fileName');
+      if (resp.statusCode != 200) {
+        throw Exception('Erro ao gerar imagem: ${resp.statusCode}');
+      }
 
-        await file.writeAsBytes(response.bodyBytes);
+      final data = jsonDecode(resp.body);
+      final base64str = data['base64'] as String?;
+      if (base64str == null || base64str.isEmpty) {
+        throw Exception('Imagem não recebida do servidor');
+      }
 
-        final result = await OpenFile.open(file.path);
+      final bytes = base64Decode(base64str);
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'badge_${badgeId}_${DateTime.now().millisecondsSinceEpoch}.png';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(bytes);
 
-        if (result.type != ResultType.done) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Não foi possível abrir o PDF')),
-            );
-          }
-        }
-      } else {
+      if (mounted) Navigator.pop(context);
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'image/png')],
+          text: '🎉 Conquistei o badge "${badge?['nome']}"! #SoftinsaTalent',
+          subject: 'Badge: ${badge?['nome']}',
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        try { Navigator.pop(context); } catch (_) {}
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao partilhar no LinkedIn: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _partilharCertificado() async {
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    try {
+      final pdfBase64 = await _obterCertificadoPdfBase64();
+      if (pdfBase64 == null) {
         if (mounted) {
+          Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erro ao descarregar ficheiro')),
+            const SnackBar(content: Text('Certificado não disponível')),
           );
         }
+        return;
       }
+
+      final badge = _badge ?? widget.badge;
+      final badgeName = (badge['nome'] ?? 'Certificado') as String;
+      final safeFileName = '${badgeName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')}.pdf';
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/$safeFileName');
+
+      await file.writeAsBytes(base64Decode(pdfBase64));
+
+      if (mounted) Navigator.pop(context);
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'application/pdf')],
+          text: 'Conquistei o badge "$badgeName"! 🎉',
+          subject: 'Certificado: $badgeName',
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
