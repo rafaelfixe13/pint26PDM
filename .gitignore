@@ -45,6 +45,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.gradle/
 
 # Node
 node_modules/
@@ -54,7 +55,6 @@ lib/node_modules/
 uploads/
 
 # Flutter platform folders
-android/
 ios/
 linux/
 macos/
