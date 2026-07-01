@@ -154,12 +154,12 @@ class _BadgeDetailPageState extends State<BadgeDetailPage> {
               tooltip: 'Partilhar Certificado',
               onPressed: _partilharCertificado,
             ),
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf, color: Colors.black),
+              tooltip: 'Partilhar Certificado',
+              onPressed: _partilharCertificado,
+            ),
           ],
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf, color: Colors.black),
-            onPressed: _partilharCertificado,
-            tooltip: 'Partilhar Certificado',
-          ),
         ],
       ),
       body: Column(

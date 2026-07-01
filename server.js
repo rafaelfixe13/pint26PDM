@@ -1604,11 +1604,11 @@ app.post('/badges/:id/generate-image', async (req, res) => {
 
   try {
     const candCheck = await pool.query(
-      'SELECT idcandidatura FROM candidaturasbadge WHERE user_id = $1 AND badge_id = $2 LIMIT 1',
-      [userId, badgeId]
+      'SELECT idcandidatura FROM candidaturasbadge WHERE user_id = $1 AND badge_id = $2 AND estado = $3 LIMIT 1',
+      [userId, badgeId, 'APPROVED']
     );
     if (candCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Nenhuma candidatura encontrada' });
+      return res.status(404).json({ error: 'Nenhuma candidatura aprovada encontrada' });
     }
 
     const badgeRes = await pool.query(
